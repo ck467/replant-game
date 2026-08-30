@@ -32,7 +32,7 @@ body {
 }
 
 /* Wood-sign panel treatment shared by info cards across all screens */
-.intro-card, .hud, .map-status, .puzzle-goal, .tutor,
+.intro-card, .hud, .map-status, .puzzle-goal,
 .overlay-card, .school-timer, .school-trees {
   background: var(--wood-pale);
   border: 3px solid var(--wood-edge);
@@ -493,6 +493,21 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .world-dead .critter { display: none; } /* no life left in a dead world */
 
+/* Tree-complete confetti, bursting from the winning cell */
+.confetti { position: fixed; z-index: 26; pointer-events: none; }
+.confetti span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fly 0.9s ease-out forwards;
+}
+@keyframes confetti-fly {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--cx), var(--cy)) rotate(var(--cr)); opacity: 0; }
+}
+
 /* Destruction dust */
 .dust {
   position: absolute;
@@ -602,7 +617,7 @@ body:has(#map-screen.active) { background: #3abe41; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 36px;
+  gap: 72px;
   position: fixed;
   top: 0;
   left: 0;
@@ -621,33 +636,14 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .puzzle-goal { width: min(92vw, 460px); font-size: 1.15rem; text-align: center; padding: 10px; }
 
-/* Staged tutorial bubble, floating mid-viewport over the board */
-.tutor {
-  position: fixed;
-  left: 50%;
-  top: 45%;
-  transform: translate(-50%, -50%);
-  z-index: 8;
-  max-width: min(84vw, 340px);
-  padding: 14px 18px;
-  font-weight: bold;
-  font-size: 1.05rem;
-  text-align: center;
-  pointer-events: none;
-  animation: tutorPop 0.35s ease;
-}
-@keyframes tutorPop {
-  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-}
 
 /* Farm plot: soil tiles inside a wooden frame; sized so the whole stack
    (header + timer + board + controls) always fits the visible viewport */
 .puzzle-board {
   display: grid;
   gap: 8px;
-  width: min(92vw, 420px, calc(100vh - 380px));
-  width: min(92vw, 420px, calc(100dvh - 380px));
+  width: min(92vw, 420px, calc(100vh - 452px));
+  width: min(92vw, 420px, calc(100dvh - 452px));
   background: #6b4a2b url('../assets/soil_16.png');
   background-size: 64px 64px;
   image-rendering: pixelated;
@@ -728,8 +724,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .puzzle-controls {
   /* Same width as the board so ← and 📖 align with its edges */
-  width: min(92vw, 420px, calc(100vh - 380px));
-  width: min(92vw, 420px, calc(100dvh - 380px));
+  width: min(92vw, 420px, calc(100vh - 452px));
+  width: min(92vw, 420px, calc(100dvh - 452px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -833,16 +829,17 @@ body:has(#map-screen.active) { background: #3abe41; }
 .overlay-card h2 { margin-bottom: 12px; }
 .overlay-card p { line-height: 1.5; }
 
-/* One toast for everything: a wood sign as wide as the game board,
-   centered over it */
+/* One toast for everything: a wood sign as wide as the game board, sitting
+   at the board's bottom end during play (top set by JS); on the map it
+   floats near the lower third */
 .toast {
   position: fixed;
-  top: 50%;
-  top: 50dvh;
+  top: 68%;
+  top: 68dvh;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  width: min(92vw, 420px, calc(100vh - 380px));
-  width: min(92vw, 420px, calc(100dvh - 380px));
+  transform: translateX(-50%) scale(0.9);
+  width: min(92vw, 420px, calc(100vh - 452px));
+  width: min(92vw, 420px, calc(100dvh - 452px));
   text-align: center;
   background: var(--wood-pale);
   border: 3px solid var(--wood-edge);
@@ -856,4 +853,4 @@ body:has(#map-screen.active) { background: #3abe41; }
   transition: opacity 0.25s, transform 0.25s;
   z-index: 20;
 }
-.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.toast.show { opacity: 1; transform: translateX(-50%) scale(1); }

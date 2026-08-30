@@ -28,12 +28,19 @@ function updateHud() {
   }
 }
 
-function toast(text) {
+function toast(text, ms = 2500) {
   const el = document.getElementById('toast');
   el.textContent = text;
+  // During play, the toast sits at the bottom end of the game board
+  if (document.getElementById('puzzle-screen').classList.contains('active')) {
+    const board = document.getElementById('puzzle-board').getBoundingClientRect();
+    el.style.top = (board.bottom + 12) + 'px';
+  } else {
+    el.style.top = '';
+  }
   el.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('show'), 2500);
+  toast.timer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 function showOverlay({ title, body, buttonText, onButton, list, button2Text, onButton2 }) {

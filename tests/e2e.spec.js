@@ -82,18 +82,18 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
   await freshGame(page, { forceStage: 1 });
   await enterMap(page);
   await page.locator('.patch.barren').first().click();
-  // Step 1: open the crate
-  await expect(page.locator('#tutor')).toBeVisible();
-  await expect(page.locator('#tutor')).toContainText('Open Crate');
+  // Step 1 arrives as a toast: open the crate
+  await expect(page.locator('#toast')).toBeVisible();
+  await expect(page.locator('#toast')).toContainText('Open Crate');
   await page.click('#crate-btn');
   await page.click('#crate-btn');
   // Step 2: merge (appears because a matching pair now exists)
-  await expect(page.locator('#tutor')).toContainText('matching pair');
+  await expect(page.locator('#toast')).toContainText('matching pair');
   const seeds = page.locator('#puzzle-board .cell.stage-1');
   await seeds.nth(0).click();
   await seeds.nth(1).click();
   // Step 3: the goal
-  await expect(page.locator('#tutor')).toContainText('Mature');
+  await expect(page.locator('#toast')).toContainText('Mature');
   // Recipe book: full chain + all four collectible trees
   await page.click('#recipe-btn');
   await expect(page.locator('#recipe-overlay.show')).toBeVisible();
@@ -109,7 +109,8 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
   await page.click('#puzzle-quit');
   await page.locator('.patch.barren').first().click();
   await expect(page.locator('#puzzle-board')).toBeVisible();
-  await expect(page.locator('#tutor')).toBeHidden();
+  await page.waitForTimeout(600);
+  await expect(page.locator('#toast')).not.toContainText('Open Crate'); // no repeat coaching
 });
 
 test('the world reset button only appears for the admin account', async ({ page }) => {
@@ -132,6 +133,7 @@ test('a run started from a dead tree restores that tree first, with your avatar'
   const target = await page.locator('.patch.barren').first().getAttribute('data-map-idx');
   await page.locator('.patch.barren').first().click();
   await winChallengeTree(page);
+  await expect(page.locator('.confetti span')).toHaveCount(16); // burst at the winning cell
   await expect(page.locator('#school-trees')).toHaveText('🌳 1/7', { timeout: 5000 });
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
   await page.click('#overlay-btn2'); // back to map
