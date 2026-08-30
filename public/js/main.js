@@ -32,9 +32,11 @@ function toast(text, ms = 2500) {
   const el = document.getElementById('toast');
   el.textContent = text;
   // During play, the toast sits at the bottom end of the game board
-  if (document.getElementById('puzzle-screen').classList.contains('active')) {
+  const inPlay = document.getElementById('puzzle-screen').classList.contains('active');
+  el.classList.toggle('over-board', inPlay);
+  if (inPlay) {
     const board = document.getElementById('puzzle-board').getBoundingClientRect();
-    el.style.top = (board.bottom + 12) + 'px';
+    el.style.top = (board.bottom - 10) + 'px'; // bottom edge tucks into the board
   } else {
     el.style.top = '';
   }

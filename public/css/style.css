@@ -617,7 +617,7 @@ body:has(#map-screen.active) { background: #3abe41; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 72px;
+  gap: 36px;
   position: fixed;
   top: 0;
   left: 0;
@@ -642,8 +642,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 .puzzle-board {
   display: grid;
   gap: 8px;
-  width: min(92vw, 420px, calc(100vh - 452px));
-  width: min(92vw, 420px, calc(100dvh - 452px));
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
   background: #6b4a2b url('../assets/soil_16.png');
   background-size: 64px 64px;
   image-rendering: pixelated;
@@ -724,8 +724,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .puzzle-controls {
   /* Same width as the board so ← and 📖 align with its edges */
-  width: min(92vw, 420px, calc(100vh - 452px));
-  width: min(92vw, 420px, calc(100dvh - 452px));
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -838,8 +838,8 @@ body:has(#map-screen.active) { background: #3abe41; }
   top: 68dvh;
   left: 50%;
   transform: translateX(-50%) scale(0.9);
-  width: min(92vw, 420px, calc(100vh - 452px));
-  width: min(92vw, 420px, calc(100dvh - 452px));
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
   text-align: center;
   background: var(--wood-pale);
   border: 3px solid var(--wood-edge);
@@ -854,3 +854,7 @@ body:has(#map-screen.active) { background: #3abe41; }
   z-index: 20;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
+/* During play the toast's BOTTOM edge aligns to the board's bottom end,
+   so it never spills onto the controls below */
+.toast.over-board { transform: translate(-50%, -100%) scale(0.9); }
+.toast.over-board.show { transform: translate(-50%, -100%) scale(1); }
