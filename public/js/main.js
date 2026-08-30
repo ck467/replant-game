@@ -153,7 +153,11 @@ function init() {
 
   worldMap = new WorldMap(socket, {
     onPatchClick: idx => challenge.start(idx),
-    onSpread: () => toast('🪓 Deforestation spread! A green patch was lost.'),
+    // Every destroyed patch teaches a real consequence
+    onSpread: () => {
+      const impact = CONFIG.IMPACTS[Math.floor(Math.random() * CONFIG.IMPACTS.length)];
+      toast(`🪓 Deforestation spread — ${impact}!`);
+    },
     onChange: () => updateHud()
   });
 
@@ -170,6 +174,13 @@ function init() {
     showOverlay, showScreen, toast,
     getAccount: () => account,
     isPatchBarren: idx => worldMap.grid[idx] === 'b'
+  });
+
+  document.getElementById('info-btn').addEventListener('click', () => {
+    document.getElementById('info-overlay').classList.add('show');
+  });
+  document.getElementById('info-close').addEventListener('click', () => {
+    document.getElementById('info-overlay').classList.remove('show');
   });
 
   document.getElementById('board-toggle').addEventListener('click', () => {

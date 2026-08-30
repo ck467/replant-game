@@ -23,6 +23,27 @@ const CONFIG = {
   // Anonymous accounts pick one of the crop-sheet portrait tiles as avatar
   AVATAR_COUNT: 20,
 
+  // The exhibition research: what deforestation causes…
+  IMPACTS: [
+    'more carbon dioxide is released into the air',
+    'greenhouse gas emissions grow',
+    "the world's biodiversity is threatened",
+    'animals lose their habitat and face extinction',
+    'soil erosion and flooding get worse',
+    'droughts become more common',
+    'global warming speeds up',
+    'less oxygen is left for every living thing'
+  ],
+  // …and what each of us can do about it
+  SOLUTIONS: [
+    'Buy FSC-certified wood and paper products',
+    'Plant one tree every year',
+    'Eat less beef',
+    'Reuse paper instead of throwing it away',
+    'Replant trees wherever they are cut down',
+    'Support indigenous land rights'
+  ],
+
   STAGE_NAMES: ['Seed', 'Sprout', 'Sapling', 'Young Tree', 'Mature Tree'],
 
   // Puzzle item art: "Farming crops 16x16" by josehzz (OpenGameArt, CC0).

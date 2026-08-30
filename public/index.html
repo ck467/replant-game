@@ -52,6 +52,7 @@
           <div class="green-bar"><div id="green-bar-fill"></div></div>
           <span id="green-pct" class="hud-pct">50%</span>
         </div>
+        <button id="info-btn" class="small-btn" title="Why it matters">ℹ️</button>
         <button id="board-toggle" class="small-btn" title="Top planters">🏆</button>
         <button id="reset-btn" class="small-btn" title="Start over (admin)" hidden>↺</button>
       </header>
@@ -85,6 +86,34 @@
     <p id="puzzle-msg" class="puzzle-msg"></p>
     <div id="tutor" class="tutor" hidden></div>
   </section>
+
+  <!-- Why it matters: the exhibition research -->
+  <div id="info-overlay" class="overlay">
+    <div class="overlay-card info-card">
+      <h2>🌍 Why it matters</h2>
+      <h3 class="info-title bad-title">🪓 When forests are cut down…</h3>
+      <ul class="info-list">
+        <li>More carbon dioxide is released</li>
+        <li>Greenhouse gas emissions grow</li>
+        <li>The world's biodiversity is threatened</li>
+        <li>Animals lose their habitat and face extinction</li>
+        <li>Soil erosion and flooding get worse</li>
+        <li>Droughts become more common</li>
+        <li>Global warming speeds up</li>
+        <li>Without trees there is no oxygen — and no us</li>
+      </ul>
+      <h3 class="info-title good-title">🌱 What YOU can do</h3>
+      <ul class="info-list good">
+        <li>Buy FSC-certified wood and paper products</li>
+        <li>Plant one tree every year</li>
+        <li>Eat less beef</li>
+        <li>Reuse paper instead of throwing it away</li>
+        <li>Replant trees wherever they are cut down</li>
+        <li>Support indigenous land rights</li>
+      </ul>
+      <button id="info-close" class="big-btn">🌳 Back to planting</button>
+    </div>
+  </div>
 
   <!-- Recipe book -->
   <div id="recipe-overlay" class="overlay">

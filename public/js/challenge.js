@@ -144,9 +144,11 @@ class Challenge {
       rankLine = ` You're #${data.rank} of ${data.total} planters!`;
     } catch (e) { /* offline? show result without rank */ }
 
+    const solution = CONFIG.SOLUTIONS[Math.floor(Math.random() * CONFIG.SOLUTIONS.length)];
     this.showOverlay({
       title: success ? `🏆 Amazing, ${acc.name}!` : "⏰ Time's up!",
-      body: `You planted ${this.treesDone} tree${this.treesDone === 1 ? '' : 's'}. Every tree counts!${rankLine}`,
+      body: `You planted ${this.treesDone} tree${this.treesDone === 1 ? '' : 's'}. Every tree counts!${rankLine}` +
+        ` 🌱 In real life: ${solution}!`,
       buttonText: '🔁 Play again',
       onButton: () => this.start(),
       button2Text: '🗺️ Back to map',

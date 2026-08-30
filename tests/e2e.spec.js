@@ -210,6 +210,24 @@ test('a bulldozer drives in to destroy a patch when the plague spreads', async (
   await expect(page.locator('#toast')).toContainText('Deforestation spread');
 });
 
+test('the Why-it-matters page shows the research, and run results teach a solution', async ({ page }) => {
+  await freshGame(page, { forceStage: 4 });
+  await enterMap(page);
+  await page.click('#info-btn');
+  await expect(page.locator('#info-overlay.show')).toBeVisible();
+  await expect(page.locator('.info-list li')).toHaveCount(14); // 8 impacts + 6 solutions
+  await expect(page.locator('#info-overlay')).toContainText('biodiversity');
+  await expect(page.locator('#info-overlay')).toContainText('indigenous land rights');
+  await page.click('#info-close');
+  await expect(page.locator('#info-overlay.show')).toBeHidden();
+  // Run results carry a real-world action
+  await shortClock(page, 3000);
+  await page.locator('.patch.barren').first().click();
+  await winChallengeTree(page);
+  await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#overlay-body')).toContainText('In real life:');
+});
+
 test('at 0% green the whole world goes dark, and replanting revives it', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
