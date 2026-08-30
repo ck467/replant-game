@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Replant: Restore the Balance</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Intro -->
+  <section id="intro-screen" class="screen active">
+    <div class="intro-card">
+      <h1>🌍 Replant</h1>
+      <h2>Restore the Balance</h2>
+      <p class="intro-story">
+        Half of our Earth is still green. The other half has turned barren —
+        and deforestation is a plague that keeps spreading, fed by greed and
+        by neglect for future generations.
+      </p>
+      <p class="intro-story">
+        You can push it back. Tap a barren patch, grow a tree from a tiny
+        seed, and bring the forest home — one patch at a time.
+      </p>
+      <div id="account-entry">
+        <div class="avatar-row">
+          <span id="avatar-preview" class="avatar-sprite big"></span>
+          <button id="avatar-reroll" class="small-btn" title="New look">🎲</button>
+        </div>
+        <input id="player-name" type="text" maxlength="20" placeholder="Your name" autocomplete="off">
+        <button id="start-btn" class="big-btn">🌱 Start Planting</button>
+      </div>
+      <div id="welcome-back" hidden>
+        <div class="avatar-row">
+          <span id="welcome-avatar" class="avatar-sprite big"></span>
+          <p id="welcome-msg" class="welcome-msg"></p>
+        </div>
+        <button id="resume-btn" class="big-btn">🌱 Keep Planting</button>
+        <button id="switch-btn" class="small-btn">🙋 New player</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- World map: a full-screen tile scene with the playable grid embedded -->
+  <section id="map-screen" class="screen">
+    <div id="world-map" class="world-map"></div>
+    <div class="map-overlay">
+      <header class="map-header">
+        <div class="hud">
+          <span class="hud-label">🌳 Green Earth</span>
+          <div class="green-bar"><div id="green-bar-fill"></div></div>
+          <span id="green-pct" class="hud-pct">50%</span>
+        </div>
+        <button id="board-toggle" class="small-btn" title="Top planters">🏆</button>
+        <button id="reset-btn" class="small-btn" title="Start over (admin)" hidden>↺</button>
+      </header>
+      <p id="map-status" class="map-status"></p>
+    </div>
+    <aside id="leaderboard" class="leaderboard">
+      <h3 class="board-title">🏆 Top Planters</h3>
+      <ol id="board-rows" class="board-rows"></ol>
+      <p id="board-empty" class="board-empty">No trees planted yet — be the first!</p>
+    </aside>
+  </section>
+
+  <!-- Puzzle session -->
+  <section id="puzzle-screen" class="screen">
+    <div class="puzzle-top">
+      <p id="puzzle-goal" class="puzzle-goal"></p>
+      <div id="school-hud" class="school-hud" hidden>
+        <span id="school-timer" class="school-timer">2:00</span>
+        <span id="school-trees" class="school-trees">🌳 0/3</span>
+      </div>
+    </div>
+    <div id="puzzle-board" class="puzzle-board"></div>
+    <div class="puzzle-controls">
+      <button id="puzzle-quit" class="small-btn ctrl-side" title="Back to the map">←</button>
+      <button id="crate-btn" class="crate-btn">
+        <span class="crate-row"><img class="crate-icon" src="assets/crate_16.png" alt="">Open Crate</span>
+        <span class="crate-count" id="crate-count"><span id="spawns-left">32</span> left</span>
+      </button>
+      <button id="recipe-btn" class="small-btn ctrl-side" title="Recipe book">📖</button>
+    </div>
+    <p id="puzzle-msg" class="puzzle-msg"></p>
+    <div id="tutor" class="tutor" hidden></div>
+  </section>
+
+  <!-- Recipe book -->
+  <div id="recipe-overlay" class="overlay">
+    <div class="overlay-card">
+      <h2>📖 Recipe</h2>
+      <p class="recipe-hint">Merge two of the same to grow the next stage!</p>
+      <div id="recipe-chain" class="recipe-chain"></div>
+      <h3 class="board-title">Trees you can collect</h3>
+      <div id="recipe-trees" class="recipe-trees"></div>
+      <button id="recipe-close" class="big-btn">Got it!</button>
+    </div>
+  </div>
+
+  <!-- Win/lose overlay -->
+  <div id="result-overlay" class="overlay">
+    <div class="overlay-card">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-body"></p>
+      <ol id="overlay-board" class="board-list" hidden></ol>
+      <button id="overlay-btn" class="big-btn"></button>
+      <button id="overlay-btn2" class="big-btn secondary" hidden></button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/account.js"></script>
+  <script src="js/puzzle.js"></script>
+  <script src="js/challenge.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ambient.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

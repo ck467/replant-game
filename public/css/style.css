@@ -1,0 +1,816 @@
+/* Replant — kid-friendly, chunky, Merge Town-ish pastel look */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sky: #bfe8ff;
+  --grass: #8fd06c;
+  --grass-dark: #5ba545;
+  --dirt: #c9a074;
+  --dirt-dark: #a97e52;
+  --card: #fffdf5;
+  --ink: #3c3228;
+  --accent: #ff9f43;
+  --accent-dark: #e8842a;
+  /* Wood-sign palette (from the tileset's fence colors) */
+  --wood-edge: #3d2817;
+  --wood: #c88a2e;
+  --wood-mid: #8a5a22;
+  --wood-light: #e8c07a;
+  --wood-pale: #f6e2b4;
+  --ink-wood: #4a2f14;
+}
+
+body {
+  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif;
+  /* The whole game lives on the farm */
+  background: #3abe41 url('../assets/grass_16.png');
+  background-size: 64px 64px;
+  image-rendering: pixelated;
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* Wood-sign panel treatment shared by info cards across all screens */
+.intro-card, .hud, .map-status, .puzzle-goal, .tutor,
+.overlay-card, .school-timer, .school-trees {
+  background: var(--wood-pale);
+  border: 3px solid var(--wood-edge);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #fff3d6, 0 4px 0 rgba(0, 0, 0, 0.3);
+  color: var(--ink-wood);
+}
+
+.screen { display: none; min-height: 100vh; flex-direction: column; align-items: center; padding: 16px; }
+.screen.active { display: flex; }
+
+/* ---------- Intro ---------- */
+.intro-card {
+  max-width: 480px;
+  margin: auto;
+  padding: 32px 28px;
+  text-align: center;
+}
+.intro-card h1 { font-size: 3rem; }
+.intro-card h2 { color: var(--grass-dark); margin-bottom: 16px; }
+.intro-story { margin: 10px 0; line-height: 1.5; }
+
+.big-btn {
+  margin-top: 20px;
+  font-family: inherit;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  background: var(--accent);
+  border: 3px solid var(--wood-edge);
+  border-radius: 10px;
+  padding: 14px 28px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 var(--accent-dark);
+  transition: transform 0.1s;
+}
+.big-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-dark); }
+.big-btn.school { background: #5b8def; box-shadow: 0 5px 0 #3a6cd6; display: block; margin: 14px auto 0; }
+.big-btn.school:active { box-shadow: 0 1px 0 #3a6cd6; }
+.big-btn.secondary { background: var(--grass-dark); box-shadow: 0 5px 0 #3d7a2e; margin-left: 10px; }
+.big-btn.secondary:active { box-shadow: 0 1px 0 #3d7a2e; }
+
+#player-name {
+  font-family: inherit;
+  font-size: 1.2rem;
+  text-align: center;
+  border: 3px solid var(--wood-edge);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 18px;
+  width: 100%;
+  background: #fffaf0;
+  color: var(--ink-wood);
+}
+
+/* ---------- Avatars (crop-sheet portrait tiles) ---------- */
+.avatar-sprite {
+  display: inline-block;
+  width: 32px;
+  aspect-ratio: 1;
+  background-image: url('../assets/crops_16x16.png');
+  background-size: 1200% 1000%;
+  background-repeat: no-repeat;
+  background-color: var(--wood-pale);
+  border: 2px solid var(--wood-edge);
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+.avatar-sprite.big { width: 64px; }
+.avatar-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.welcome-msg { font-weight: bold; font-size: 1.2rem; }
+#switch-btn { margin-top: 14px; }
+
+/* Restored patches wear their planter's portrait */
+.patch { position: relative; }
+.patch .patch-owner {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 22px;
+  pointer-events: none;
+}
+
+/* ---------- Leaderboard: pinned on desktop, drawer on small screens ---------- */
+.leaderboard {
+  position: absolute;
+  top: 90px;
+  right: 12px;
+  width: 250px;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  z-index: 6;
+  padding: 12px;
+  background: var(--wood-pale);
+  border: 3px solid var(--wood-edge);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #fff3d6, 0 4px 0 rgba(0, 0, 0, 0.3);
+  color: var(--ink-wood);
+}
+.leaderboard .board-title { margin: 0 0 10px; text-align: center; color: var(--wood-mid); }
+.board-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  counter-reset: rank;
+}
+.board-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap; /* stats drop to a second line rather than eating the name */
+  gap: 4px 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-weight: bold;
+}
+.board-row::before {
+  counter-increment: rank;
+  content: counter(rank);
+  width: 1.2em;
+  font-size: 0.85rem;
+  color: var(--wood-mid);
+}
+.board-row .avatar-sprite { width: 26px; flex: none; }
+.board-row.me { outline: 3px solid var(--grass-dark); }
+.board-name {
+  flex: 1;
+  min-width: 10ch; /* at least 10 characters visible before truncating */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-stats { font-size: 0.78rem; color: var(--wood-mid); white-space: nowrap; margin-left: auto; }
+.board-empty { font-size: 0.85rem; text-align: center; color: var(--wood-mid); margin: 4px 0 0; }
+
+@media (min-width: 1000px) {
+  #board-toggle { display: none; } /* board is always on screen */
+}
+@media (max-width: 999px) {
+  /* Bottom-up card drawer */
+  .leaderboard {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 60vh;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+    padding-top: 20px;
+    transform: translateY(105%);
+    transition: transform 0.28s ease;
+    z-index: 9;
+  }
+  .leaderboard::before {
+    /* grab handle */
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--wood-mid);
+  }
+  .leaderboard.open { transform: translateY(0); }
+}
+
+.board-title { margin: 22px 0 8px; color: var(--grass-dark); }
+.board-list {
+  text-align: left;
+  margin: 8px auto 0;
+  padding-left: 28px;
+  max-width: 320px;
+  line-height: 1.7;
+  font-weight: bold;
+}
+.board-list li::marker { color: var(--accent-dark); }
+
+.school-hud[hidden] { display: none; }
+.school-hud {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin: 6px 0 2px;
+}
+.school-timer {
+  font-size: 1.6rem;
+  font-weight: bold;
+  padding: 6px 16px;
+  min-width: 3.2em;
+  text-align: center;
+}
+.school-timer.low { color: #d63031; animation: pulse 0.5s infinite alternate; }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+.school-trees {
+  font-size: 1.3rem;
+  font-weight: bold;
+  padding: 8px 16px;
+}
+
+.small-btn {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: bold;
+  background: var(--wood-light);
+  color: var(--ink-wood);
+  border: 3px solid var(--wood-edge);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.small-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3); }
+
+/* ---------- World map (full-screen tile scene) ---------- */
+#map-screen.active {
+  display: block;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  padding: 0;
+  /* Fixed crisp tile size (4x pixel scale); the world is an expansive
+     32x18 scene that the player drags to pan */
+  --tile: 64px;
+  /* Flat farm green (#3abe41 = the grass tile's base color) behind the
+     scene so letterboxing on huge screens blends in */
+  background: #3abe41;
+  image-rendering: pixelated;
+  cursor: grab;
+  touch-action: none; /* finger-drag pans instead of scrolling the page */
+}
+#map-screen.active.panning { cursor: grabbing; }
+/* Page behind the map matches the farm, so overscroll never flashes cream */
+html:has(#map-screen.active),
+body:has(#map-screen.active) { background: #3abe41; }
+.map-overlay {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+/* Only actual buttons catch the pointer — the info cards are click-through
+   so patches underneath them stay tappable */
+.map-overlay button { pointer-events: auto; }
+.map-header {
+  width: min(92vw, 700px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 12px;
+}
+.hud { flex: 1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.hud-label { font-weight: bold; white-space: nowrap; }
+@media (max-width: 480px) {
+  .hud-label { display: none; } /* the bar + % speak for themselves */
+}
+.hud-pct { font-weight: bold; min-width: 3.2em; text-align: right; }
+.green-bar { flex: 1; min-width: 110px; height: 16px; background: var(--dirt); border-radius: 8px; overflow: hidden; border: 2px solid var(--wood-edge); }
+#green-bar-fill { height: 100%; width: 50%; background: var(--grass-dark); border-radius: 8px; transition: width 0.5s; }
+
+.map-status {
+  font-weight: bold;
+  text-align: center;
+  padding: 6px 16px;
+}
+.map-status.good { color: var(--grass-dark); }
+.map-status.bad { color: #d63031; }
+
+/* Pixel-art world map — "Blind Hummingbird" forest set by Spriteshift (CC0).
+   Tiles are 16px in 8x4 sheets, addressed as CSS sprites:
+   x% = col/7*100, y% = row/3*100, one tile fills a patch at size 800% 400%.
+   The scene grid (scenery + playable patches) is built by map.js. */
+.world-map {
+  /* Positioned by the pan transform in map.js */
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  gap: 0;
+  width: max-content;
+  grid-auto-rows: var(--tile);
+  will-change: transform;
+}
+.scene-cell {
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+/* Flowing water: the tile repeats and its position drifts by exactly one
+   tile per loop, so the streaks appear to flow (down, or left toward the
+   river mouth). */
+.scene-cell.water-v,
+.scene-cell.water-h {
+  background-repeat: repeat;
+  background-size: var(--tile) var(--tile);
+}
+.scene-cell.water-v {
+  background-image: url('../assets/water_v_16.png');
+  animation: flow-down 2.8s linear infinite;
+}
+.scene-cell.water-h {
+  background-image: url('../assets/water_16.png');
+  animation: flow-left 2.8s linear infinite;
+}
+@keyframes flow-down { to { background-position: 0 var(--tile); } }
+@keyframes flow-left { to { background-position: calc(-1 * var(--tile)) 0; } }
+.patch {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0;
+  background-repeat: no-repeat;
+  background-size: 800% 400%;
+  image-rendering: pixelated;
+  transition: transform 0.15s;
+}
+/* Green forest: bush canopy (5,1); clearings show plain grass (4,1) + decor */
+.patch.green {
+  background-image: url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-position: 71.428571% 33.333333%;
+  cursor: default;
+}
+.patch.green.clearing { background-position: 57.142857% 33.333333%; }
+.patch.green.clearing.d0,
+.patch.green.clearing.d1,
+.patch.green.clearing.d2,
+.patch.green.clearing.d3 {
+  background-image: url('../assets/forest_decoration_set_16x16.png'),
+                    url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-size: 800% 400%, 800% 400%;
+}
+.patch.green.clearing.d0 { background-position: 42.857143% 33.333333%, 57.142857% 33.333333%; } /* flowers */
+.patch.green.clearing.d1 { background-position: 100% 0%, 57.142857% 33.333333%; }               /* red mushroom */
+.patch.green.clearing.d2 { background-position: 28.571429% 33.333333%, 57.142857% 33.333333%; } /* sprigs */
+.patch.green.clearing.d3 { background-position: 57.142857% 33.333333%, 57.142857% 33.333333%; } /* white flowers */
+/* Barren: burnt bush (5,2) on dead grey grass (4,2); clearings show logs/rocks */
+/* Barren patches are the interactable dead trees waiting to be restored */
+.patch.barren {
+  background-image: url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-position: 71.428571% 66.666667%;
+  cursor: pointer;
+  transition: scale 0.15s ease, filter 0.15s ease;
+}
+.patch.barren:hover {
+  scale: 1.18;
+  filter: brightness(1.25);
+  z-index: 2;
+  position: relative;
+}
+.patch.barren.clearing { background-position: 57.142857% 66.666667%; }
+.patch.barren.clearing.d0,
+.patch.barren.clearing.d1 {
+  background-image: url('../assets/forest_decoration_set_16x16.png'),
+                    url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-size: 800% 400%, 800% 400%;
+}
+.patch.barren.clearing.d0 { background-position: 28.571429% 0%, 57.142857% 66.666667%; } /* fallen log */
+.patch.barren.clearing.d1 { background-position: 85.714286% 0%, 57.142857% 66.666667%; } /* rock */
+/* Living forest sways in the wind (per-patch delay/duration set by map.js) */
+.patch.green:not(.clearing),
+.scene-cell.grove {
+  animation: sway var(--sway-dur, 3.2s) ease-in-out var(--sway-delay, 0s) infinite alternate;
+  transform-origin: 50% 85%;
+}
+@keyframes sway {
+  from { transform: rotate(-0.8deg); }
+  to { transform: rotate(0.8deg) scale(1.012); }
+}
+/* These are declared after sway so they take over while the class lasts */
+.patch.patch-restored { animation: sprout 0.6s ease; }
+.patch.patch-lost { animation: wither 0.6s ease; }
+.patch.patch-shake { animation: shake 0.18s linear 4; }
+@keyframes shake {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -2px 1px; }
+  75% { translate: 2px -1px; }
+}
+
+/* Bulldozers: the deforestation made visible */
+.dozer {
+  position: absolute;
+  width: var(--tile);
+  height: var(--tile);
+  background: url('../assets/bulldozer_16.png');
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.3));
+  transition: left 4s linear, top 4s linear;
+}
+.dozer.flip { transform: scaleX(-1); }
+.dozer.rush { transition-duration: 1.2s, 1.2s; }
+
+/* Beetles: roaming critters with the sheet's 4-frame walk cycle (row 1) */
+.critter {
+  position: absolute;
+  width: calc(var(--tile) * 0.8);
+  height: calc(var(--tile) * 0.8);
+  margin: calc(var(--tile) * 0.1);
+  background-image: url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-size: 800% 400%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  z-index: 2;
+  pointer-events: none;
+  transition: left 8s linear, top 8s linear;
+  animation: beetle-walk 0.7s infinite;
+}
+.critter.flip { transform: scaleX(-1); }
+@keyframes beetle-walk {
+  0%, 100% { background-position: 0% 33.3333%; animation-timing-function: step-end; }
+  25% { background-position: 14.2857% 33.3333%; animation-timing-function: step-end; }
+  50% { background-position: 28.5714% 33.3333%; animation-timing-function: step-end; }
+  75% { background-position: 42.8571% 33.3333%; animation-timing-function: step-end; }
+}
+.world-dead .critter { display: none; } /* no life left in a dead world */
+
+/* Destruction dust */
+.dust {
+  position: absolute;
+  width: var(--tile);
+  height: var(--tile);
+  z-index: 4;
+  pointer-events: none;
+}
+.dust .puff {
+  position: absolute;
+  left: 45%;
+  top: 55%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d8d3c5;
+  border: 2px solid #8a8577;
+  opacity: 0;
+  animation: puff 0.7s ease-out forwards;
+}
+@keyframes puff {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, -18px)) scale(1.7); opacity: 0; }
+}
+
+/* Total collapse: at 0% green the whole world darkens and life vanishes */
+.world-dead .world-map { filter: brightness(0.68) saturate(0.55); transition: filter 1.2s ease; }
+.world-dead .fly-swarm,
+.world-dead .hummer,
+.world-dead .gust { display: none; }
+
+/* ---------- Ambient life ---------- */
+#ambient-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+.gust {
+  position: absolute;
+  left: -15vw;
+  width: 64px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.5);
+  box-shadow: 16px 6px 0 rgba(255,255,255,0.35), -12px -5px 0 rgba(255,255,255,0.3);
+  animation: gust-move 5s linear forwards;
+}
+@keyframes gust-move {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 0.8; }
+  85% { opacity: 0.5; }
+  100% { transform: translate(130vw, -5vh); opacity: 0; }
+}
+.fly-swarm { position: absolute; width: 26px; height: 26px; animation: swarm-drift 9s ease-in-out infinite alternate; }
+@keyframes swarm-drift { to { transform: translate(34px, -16px); } }
+.fly {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #2b2b2b;
+  animation: fly-orbit 2.6s ease-in-out infinite;
+}
+.fly.f1 { left: 9px; top: 5px; animation-duration: 3.3s; animation-delay: 0.4s; }
+.fly.f2 { left: 16px; top: 12px; animation-duration: 2.1s; animation-delay: 0.9s; }
+@keyframes fly-orbit {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(9px, -7px); }
+  50% { transform: translate(2px, 6px); }
+  75% { transform: translate(-8px, -3px); }
+}
+.hummer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--tile);
+  height: var(--tile);
+  background-image: url('../assets/blind_hummingbird_spritesheet_16x16.png');
+  background-size: 800% 400%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  animation: hummer-path 13s linear forwards, hummer-flap 0.25s steps(1) infinite;
+}
+@keyframes hummer-flap {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 14.2857% 0%; }
+}
+@keyframes hummer-path {
+  0% { transform: translate(-12vw, var(--y0, 30vh)); }
+  50% { transform: translate(55vw, calc(var(--y1, 40vh) + 4vh)); }
+  100% { transform: translate(115vw, var(--y1, 40vh)); }
+}
+
+@keyframes sprout { 0% { transform: scale(0.3); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes wither { 0% { transform: scale(1.25); filter: saturate(2); } 100% { transform: scale(1); } }
+
+/* ---------- Puzzle ---------- */
+/* Gameplay layout: goal + timer pinned top, board centered in the
+   viewport, controls anchored to the bottom */
+#puzzle-screen.active {
+  display: block;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.puzzle-top {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.puzzle-goal { width: min(92vw, 460px); font-size: 1.15rem; text-align: center; padding: 10px; }
+
+/* Staged tutorial bubble, floating mid-viewport over the board */
+.tutor {
+  position: fixed;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  max-width: min(84vw, 340px);
+  padding: 14px 18px;
+  font-weight: bold;
+  font-size: 1.05rem;
+  text-align: center;
+  pointer-events: none;
+  animation: tutorPop 0.35s ease;
+}
+@keyframes tutorPop {
+  0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* Farm plot: soil tiles inside a wooden frame, centered in the viewport */
+.puzzle-board {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 8px;
+  width: min(92vw, min(420px, 52vh));
+  background: #6b4a2b url('../assets/soil_16.png');
+  background-size: 64px 64px;
+  image-rendering: pixelated;
+  padding: 12px;
+  border: 6px solid var(--wood-mid);
+  outline: 3px solid var(--wood-edge);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3), 0 6px 0 rgba(0,0,0,0.3);
+}
+.cell {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 0 0 2px rgba(61, 40, 23, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: none; /* let pointer-drag work on touch screens */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cell.drag-source { opacity: 0.35; }
+.cell.drop-ok { outline: 4px solid var(--grass-dark); transform: scale(1.06); }
+.drag-ghost {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.08) rotate(3deg);
+  opacity: 0.9;
+}
+
+/* Item in flight from the crate to its cell */
+.spawn-flyer {
+  position: fixed;
+  z-index: 25;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 4px rgba(0,0,0,0.25));
+}
+/* While the flyer travels, its cell still looks empty */
+.cell.filled.landing { background: #c5a17e; box-shadow: inset 0 3px 6px rgba(0,0,0,0.2); }
+.cell.landing > * { visibility: hidden; }
+.cell.filled {
+  background: #f9ecd2;
+  border: 2px solid var(--wood-edge);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28);
+}
+.cell.selected { outline: 4px solid var(--accent); transform: scale(1.06); }
+/* Puzzle item sprites — "Farming crops 16x16" by josehzz (CC0), 12x10 sheet */
+.cell-sprite {
+  display: block;
+  width: 58%;
+  aspect-ratio: 1;
+  background-image: url('../assets/crops_16x16.png');
+  background-size: 1200% 1000%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.goal-sprite {
+  display: inline-block;
+  width: 30px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.flyer-sprite { width: 52px; }
+.cell-label { font-size: 0.7rem; font-weight: bold; color: #6b5d4f; }
+.cell-stage { font-size: 0.55rem; color: var(--grass-dark); letter-spacing: 2px; }
+.cell.pop-in { animation: popIn 0.3s ease; }
+.cell.pop-merge { animation: popMerge 0.4s ease; }
+
+@keyframes popIn { 0% { transform: scale(0.2); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes popMerge { 0% { transform: scale(1.4) rotate(-6deg); } 100% { transform: scale(1); } }
+
+.puzzle-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Same width as the board so ← and 📖 align with its edges */
+  width: min(92vw, min(420px, 52vh));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ctrl-side { font-size: 1.3rem; padding: 12px 16px; }
+
+/* Recipe book */
+.recipe-hint { margin-bottom: 12px; }
+.recipe-chain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.recipe-step {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 6px;
+}
+.recipe-step .cell-sprite { width: 40px; }
+.recipe-step.current { background: rgba(91, 165, 69, 0.25); outline: 2px solid var(--grass-dark); }
+.recipe-label { font-size: 0.68rem; font-weight: bold; color: var(--wood-mid); }
+.recipe-arrow { color: var(--wood-mid); font-weight: bold; }
+.recipe-trees {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+.crate-btn {
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  background: var(--wood);
+  border: 3px solid var(--wood-edge);
+  border-radius: 10px;
+  padding: 12px 26px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 2px var(--wood-light), 0 5px 0 #6b3f1a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.crate-btn .crate-row { display: flex; align-items: center; gap: 10px; }
+.crate-icon { width: 36px; height: 36px; image-rendering: pixelated; }
+.crate-btn:active { transform: translateY(4px); box-shadow: inset 0 0 0 2px var(--wood-light), 0 1px 0 #6b3f1a; }
+.crate-btn:disabled { background: #8a8377; box-shadow: 0 5px 0 #6b665c; cursor: not-allowed; filter: grayscale(0.6); }
+.crate-count { font-size: 0.8rem; font-weight: normal; }
+
+.puzzle-msg {
+  position: absolute;
+  bottom: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-weight: bold;
+  color: #d63031;
+  text-shadow: 0 1px 0 #fff;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.puzzle-msg.show { opacity: 1; }
+
+/* ---------- Overlay & toast ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 30, 20, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+.overlay.show { display: flex; }
+.overlay-card {
+  padding: 30px 26px;
+  max-width: 420px;
+  text-align: center;
+  animation: popIn 0.35s ease;
+}
+.overlay-card h2 { margin-bottom: 12px; }
+.overlay-card p { line-height: 1.5; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-weight: bold;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 20;
+}
+.toast.show { opacity: 1; }

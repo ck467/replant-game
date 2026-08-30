@@ -1,0 +1,21 @@
+{
+  "name": "replant",
+  "version": "0.1.0",
+  "description": "Replant: Restore the Balance — a merge game about reversing deforestation (grade 6 IB exhibition project)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}
