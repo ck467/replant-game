@@ -184,7 +184,7 @@ body:has(#puzzle-screen.active) {
   color: var(--wood-mid);
 }
 .board-row .avatar-sprite { width: 26px; flex: none; }
-.board-row.me { outline: 3px solid var(--grass-dark); }
+.board-row.me { background: #cdf0b8; } /* the player's own row glows light green */
 .board-name {
   flex: 1;
   min-width: 10ch; /* at least 10 characters visible before truncating */
@@ -562,12 +562,31 @@ body:has(#map-screen.active) { background: #3abe41; }
 .world-dead .gust { display: none; }
 
 /* ---------- Ambient life ---------- */
-#ambient-layer {
+#ambient-layer,
+#ambient-puzzle {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 4;
+}
+
+/* Leaves drifting down over the puzzle */
+.leaf {
+  position: absolute;
+  top: -24px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px 8px 2px 8px;
+  opacity: 0.9;
+  animation: leaf-fall linear forwards;
+}
+@keyframes leaf-fall {
+  0% { transform: translate(0, -20px) rotate(0deg); }
+  25% { transform: translate(26px, 28vh) rotate(100deg); }
+  50% { transform: translate(-18px, 55vh) rotate(210deg); }
+  75% { transform: translate(22px, 80vh) rotate(310deg); }
+  100% { transform: translate(-10px, 108vh) rotate(430deg); }
 }
 .gust {
   position: absolute;

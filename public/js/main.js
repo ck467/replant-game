@@ -6,6 +6,8 @@ let account = null;
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Screen changes always tuck the leaderboard drawer away
+  document.getElementById('leaderboard').classList.remove('open');
 }
 
 function updateHud() {
@@ -195,6 +197,14 @@ function init() {
   document.getElementById('board-toggle').addEventListener('click', () => {
     document.getElementById('leaderboard').classList.toggle('open');
   });
+  // Tapping anywhere outside the open drawer dismisses it
+  document.addEventListener('pointerdown', e => {
+    const drawer = document.getElementById('leaderboard');
+    if (drawer.classList.contains('open') &&
+        !e.target.closest('#leaderboard') && !e.target.closest('#board-toggle')) {
+      drawer.classList.remove('open');
+    }
+  }, true);
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     if (confirm('Start the world over for EVERYONE playing?')) worldMap.reset();

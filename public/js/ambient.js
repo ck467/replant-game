@@ -24,16 +24,37 @@ function startAmbient() {
     layer.appendChild(swarm);
   });
 
-  // Gusts of wind sweeping across
+  // The puzzle screen gets its own ambient layer (leaves + gusts)
+  const puzzleHost = document.getElementById('puzzle-screen');
+  const puzzleLayer = document.createElement('div');
+  puzzleLayer.id = 'ambient-puzzle';
+  puzzleHost.appendChild(puzzleLayer);
+  const onPuzzle = () => puzzleHost.classList.contains('active');
+
+  // Gusts of wind sweeping across whichever scene is on screen
   setInterval(() => {
-    if (!onMap()) return;
+    const host = onMap() ? layer : (onPuzzle() ? puzzleLayer : null);
+    if (!host) return;
     const gust = document.createElement('div');
     gust.className = 'gust';
     gust.style.top = (8 + Math.random() * 70) + '%';
     gust.style.animationDuration = (4 + Math.random() * 3) + 's';
     gust.addEventListener('animationend', () => gust.remove());
-    layer.appendChild(gust);
+    host.appendChild(gust);
   }, 3500);
+
+  // Leaves drift down over the farm plot while you play
+  const LEAF_COLORS = ['#58b04a', '#7ccf5c', '#4a9e3e', '#ffd93d'];
+  setInterval(() => {
+    if (!onPuzzle()) return;
+    const leaf = document.createElement('span');
+    leaf.className = 'leaf';
+    leaf.style.left = (5 + Math.random() * 90) + '%';
+    leaf.style.background = LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)];
+    leaf.style.animationDuration = (6 + Math.random() * 4) + 's';
+    leaf.addEventListener('animationend', () => leaf.remove());
+    puzzleLayer.appendChild(leaf);
+  }, 2200);
 
   // A hummingbird flies through every so often
   const flyBy = () => {

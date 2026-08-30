@@ -122,6 +122,8 @@ test('rare crate drops show Lucky floating text', async ({ page }) => {
   await page.evaluate(() => { window.__TEST_FORCE_SPAWN_STAGE = 4; });
   await page.click('#crate-btn');
   await expect(page.locator('.lucky-vfx').last()).toHaveText('Super Lucky!');
+  // Ambient leaves drift over the plot while playing
+  await expect(page.locator('#ambient-puzzle .leaf').first()).toBeAttached({ timeout: 6000 });
 });
 
 test('the world reset button only appears for the admin account', async ({ page }) => {
@@ -316,6 +318,9 @@ test('leaderboard is pinned on desktop and a drawer on small screens', async ({ 
     return r.height >= window.innerHeight * 0.5;
   });
   expect(half).toBe(true);
+  // Tapping outside the drawer dismisses it
+  await page.mouse.click(40, 150);
+  await expect(page.locator('#leaderboard')).not.toBeInViewport();
 });
 
 test('two players share one world: a restore by one appears for the other', async ({ browser }) => {
