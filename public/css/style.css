@@ -44,6 +44,16 @@ body {
 .screen { display: none; min-height: 100vh; flex-direction: column; align-items: center; padding: 16px; }
 .screen.active { display: flex; }
 
+/* Gameplay screens must never scroll and always match the VISIBLE viewport
+   (100dvh tracks mobile browser chrome; plain vh does not) */
+html, body { overscroll-behavior: none; }
+body:has(#map-screen.active),
+body:has(#puzzle-screen.active) {
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* ---------- Intro ---------- */
 .intro-card {
   max-width: 480px;
@@ -190,9 +200,11 @@ body {
     right: 0;
     width: auto;
     max-height: 60vh;
+    max-height: 60dvh;
     border-radius: 16px 16px 0 0;
     border-bottom: none;
     padding-top: 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
     transform: translateY(105%);
     transition: transform 0.28s ease;
     z-index: 9;
@@ -263,7 +275,11 @@ body {
 #map-screen.active {
   display: block;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh; /* track the visible viewport under mobile browser chrome */
   overflow: hidden;
   padding: 0;
   /* Fixed crisp tile size (4x pixel scale); the world is an expansive
@@ -573,7 +589,11 @@ body:has(#map-screen.active) { background: #3abe41; }
 #puzzle-screen.active {
   display: block;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh; /* track the visible viewport under mobile browser chrome */
   overflow: hidden;
   padding: 0;
 }
@@ -700,7 +720,7 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .puzzle-controls {
   position: absolute;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   /* Same width as the board so ← and 📖 align with its edges */
@@ -711,8 +731,17 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .ctrl-side { font-size: 1.3rem; padding: 12px 16px; }
 
-/* Why it matters (exhibition research) */
-.overlay-card.info-card { max-height: 86vh; overflow-y: auto; text-align: left; }
+/* Why it matters (exhibition research) — the lists scroll inside the card,
+   the close button stays pinned and always visible */
+.overlay-card.info-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 84vh;
+  max-height: 84dvh;
+  overflow: hidden;
+  text-align: left;
+}
+.info-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .info-card h2, .info-card .info-title { text-align: center; }
 .info-title { margin: 14px 0 6px; }
 .bad-title { color: #b03a2e; }
@@ -720,7 +749,7 @@ body:has(#map-screen.active) { background: #3abe41; }
 .info-list { margin: 0; padding-left: 24px; line-height: 1.55; }
 .info-list li::marker { content: '🍂 '; }
 .info-list.good li::marker { content: '🌱 '; }
-.info-card .big-btn { display: block; margin: 18px auto 0; }
+.info-card .big-btn { display: block; margin: 14px auto 0; flex: none; }
 
 /* Recipe book */
 .recipe-hint { margin-bottom: 12px; }
@@ -776,7 +805,7 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .puzzle-msg {
   position: absolute;
-  bottom: 110px;
+  bottom: calc(110px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -803,6 +832,9 @@ body:has(#map-screen.active) { background: #3abe41; }
 .overlay-card {
   padding: 30px 26px;
   max-width: 420px;
+  max-height: 88vh;
+  max-height: 88dvh;
+  overflow-y: auto;
   text-align: center;
   animation: popIn 0.35s ease;
 }
@@ -811,7 +843,7 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .toast {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: var(--ink);

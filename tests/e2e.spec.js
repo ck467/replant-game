@@ -218,6 +218,10 @@ test('the Why-it-matters page shows the research, and run results teach a soluti
   await expect(page.locator('.info-list li')).toHaveCount(14); // 8 impacts + 6 solutions
   await expect(page.locator('#info-overlay')).toContainText('biodiversity');
   await expect(page.locator('#info-overlay')).toContainText('indigenous land rights');
+  // On a short phone screen the close button must stay pinned in view
+  await page.setViewportSize({ width: 390, height: 600 });
+  await expect(page.locator('#info-close')).toBeInViewport();
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.click('#info-close');
   await expect(page.locator('#info-overlay.show')).toBeHidden();
   // Run results carry a real-world action
