@@ -46,6 +46,9 @@ body {
 
 /* Gameplay screens must never scroll and always match the VISIBLE viewport
    (100dvh tracks mobile browser chrome; plain vh does not) */
+/* manipulation kills iOS double-tap zoom on rapid taps (the crate button!);
+   the viewport meta alone is ignored by Safari */
+html { touch-action: manipulation; }
 html, body { overscroll-behavior: none; }
 body:has(#map-screen.active),
 body:has(#puzzle-screen.active) {
@@ -140,7 +143,8 @@ body:has(#puzzle-screen.active) {
   right: 12px;
   width: 250px;
   max-height: calc(100vh - 130px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   z-index: 6;
   padding: 12px;
   background: var(--wood-pale);
@@ -158,6 +162,9 @@ body:has(#puzzle-screen.active) {
   flex-direction: column;
   gap: 6px;
   counter-reset: rank;
+  overflow-y: auto; /* the player list scrolls inside the panel */
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
 }
 .board-row {
   display: flex;
@@ -192,15 +199,16 @@ body:has(#puzzle-screen.active) {
   #board-toggle { display: none; } /* board is always on screen */
 }
 @media (max-width: 999px) {
-  /* Bottom-up card drawer */
+  /* Bottom-up card drawer: covers at least half the viewport when open */
   .leaderboard {
     top: auto;
     bottom: 0;
     left: 0;
     right: 0;
     width: auto;
-    max-height: 60vh;
-    max-height: 60dvh;
+    height: 55vh;
+    height: 55dvh;
+    max-height: none;
     border-radius: 16px 16px 0 0;
     border-bottom: none;
     padding-top: 20px;
@@ -594,7 +602,7 @@ body:has(#map-screen.active) { background: #3abe41; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 36px;
   position: fixed;
   top: 0;
   left: 0;
@@ -638,8 +646,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 .puzzle-board {
   display: grid;
   gap: 8px;
-  width: min(92vw, 420px, calc(100vh - 320px));
-  width: min(92vw, 420px, calc(100dvh - 320px));
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
   background: #6b4a2b url('../assets/soil_16.png');
   background-size: 64px 64px;
   image-rendering: pixelated;
@@ -720,8 +728,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 
 .puzzle-controls {
   /* Same width as the board so ← and 📖 align with its edges */
-  width: min(92vw, 420px, calc(100vh - 320px));
-  width: min(92vw, 420px, calc(100dvh - 320px));
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -800,19 +808,6 @@ body:has(#map-screen.active) { background: #3abe41; }
 .crate-btn:disabled { background: #8a8377; box-shadow: 0 5px 0 #6b665c; cursor: not-allowed; filter: grayscale(0.6); }
 .crate-count { font-size: 0.8rem; font-weight: normal; }
 
-.puzzle-msg {
-  position: absolute;
-  bottom: calc(110px + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-weight: bold;
-  color: #d63031;
-  text-shadow: 0 1px 0 #fff;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.puzzle-msg.show { opacity: 1; }
 
 /* ---------- Overlay & toast ---------- */
 .overlay {
@@ -838,19 +833,27 @@ body:has(#map-screen.active) { background: #3abe41; }
 .overlay-card h2 { margin-bottom: 12px; }
 .overlay-card p { line-height: 1.5; }
 
+/* One toast for everything: a wood sign as wide as the game board,
+   centered over it */
 .toast {
   position: fixed;
-  bottom: calc(24px + env(safe-area-inset-bottom));
+  top: 50%;
+  top: 50dvh;
   left: 50%;
-  transform: translateX(-50%);
-  background: var(--ink);
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 14px;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: min(92vw, 420px, calc(100vh - 380px));
+  width: min(92vw, 420px, calc(100dvh - 380px));
+  text-align: center;
+  background: var(--wood-pale);
+  border: 3px solid var(--wood-edge);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #fff3d6, 0 4px 0 rgba(0, 0, 0, 0.3);
+  color: var(--ink-wood);
+  padding: 14px 18px;
   font-weight: bold;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s;
+  transition: opacity 0.25s, transform 0.25s;
   z-index: 20;
 }
-.toast.show { opacity: 1; }
+.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }

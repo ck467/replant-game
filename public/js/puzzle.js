@@ -122,7 +122,7 @@ class Puzzle {
     const empties = [];
     this.board.forEach((v, i) => { if (v === 0) empties.push(i); });
     if (empties.length === 0) {
-      this.flashMessage('Board is full — merge something first!');
+      toast('🧺 The plot is full — merge something first!');
       return;
     }
     const idx = empties[Math.floor(Math.random() * empties.length)];
@@ -367,14 +367,6 @@ class Puzzle {
     cell.classList.remove('pop-in', 'pop-merge');
     void cell.offsetWidth; // restart animation
     cell.classList.add(cls);
-  }
-
-  flashMessage(text) {
-    const msg = document.getElementById('puzzle-msg');
-    msg.textContent = text;
-    msg.classList.add('show');
-    clearTimeout(this.msgTimer);
-    this.msgTimer = setTimeout(() => msg.classList.remove('show'), 1800);
   }
 
   itemLabel(stage) {

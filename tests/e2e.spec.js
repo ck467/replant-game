@@ -297,6 +297,12 @@ test('leaderboard is pinned on desktop and a drawer on small screens', async ({ 
   await expect(page.locator('#board-toggle')).toBeVisible();
   await page.click('#board-toggle');
   await expect(page.locator('#leaderboard')).toBeInViewport();
+  // The open drawer covers at least half the viewport
+  const half = await page.evaluate(() => {
+    const r = document.getElementById('leaderboard').getBoundingClientRect();
+    return r.height >= window.innerHeight * 0.5;
+  });
+  expect(half).toBe(true);
 });
 
 test('two players share one world: a restore by one appears for the other', async ({ browser }) => {
