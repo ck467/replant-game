@@ -33,12 +33,13 @@ function updateHud() {
 function toast(text, ms = 2500) {
   const el = document.getElementById('toast');
   el.textContent = text;
-  // During play, the toast sits at the bottom end of the game board
+  // During play, the toast lives in the open area between the top UI and board
   const inPlay = document.getElementById('puzzle-screen').classList.contains('active');
   el.classList.toggle('over-board', inPlay);
   if (inPlay) {
+    const top = document.querySelector('.puzzle-top').getBoundingClientRect();
     const board = document.getElementById('puzzle-board').getBoundingClientRect();
-    el.style.top = (board.bottom - 10) + 'px'; // bottom edge tucks into the board
+    el.style.top = Math.round((top.bottom + board.top) / 2) + 'px';
   } else {
     el.style.top = '';
   }

@@ -650,15 +650,14 @@ body:has(#map-screen.active) { background: #3abe41; }
 /* ---------- Puzzle ---------- */
 /* Gameplay layout: goal + timer pinned top, board centered in the
    viewport, controls anchored to the bottom */
-/* One centered flex stack — nothing is anchored to the viewport bottom, so
-   mobile browser chrome can never cover the controls. The gap above and
-   below the board is identical by construction. */
+/* Goal + timer pin to the top; the board/controls group centers in the
+   remaining space. The open area between them is where toasts live.
+   Nothing anchors to the viewport bottom, so mobile chrome can't cover it. */
 #puzzle-screen.active {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 36px;
+  justify-content: flex-start;
   position: fixed;
   top: 0;
   left: 0;
@@ -674,7 +673,10 @@ body:has(#map-screen.active) { background: #3abe41; }
   align-items: center;
   gap: 8px;
   pointer-events: none;
+  margin-bottom: auto; /* everything below floats free of the top UI */
 }
+.puzzle-board { margin-top: auto; }
+.puzzle-controls { margin: 36px 0 auto; }
 .puzzle-goal { width: min(92vw, 460px); font-size: 1.15rem; text-align: center; padding: 10px; }
 
 
@@ -895,7 +897,6 @@ body:has(#map-screen.active) { background: #3abe41; }
   z-index: 20;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) scale(1); }
-/* During play the toast's BOTTOM edge aligns to the board's bottom end,
-   so it never spills onto the controls below */
-.toast.over-board { transform: translate(-50%, -100%) scale(0.9); }
-.toast.over-board.show { transform: translate(-50%, -100%) scale(1); }
+/* During play the toast centers in the open band between top UI and board */
+.toast.over-board { transform: translate(-50%, -50%) scale(0.9); }
+.toast.over-board.show { transform: translate(-50%, -50%) scale(1); }
