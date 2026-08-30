@@ -113,6 +113,17 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
   await expect(page.locator('#toast')).not.toContainText('Open Crate'); // no repeat coaching
 });
 
+test('rare crate drops show Lucky floating text', async ({ page }) => {
+  await freshGame(page, { forceStage: 3 });
+  await enterMap(page);
+  await page.locator('.patch.barren').first().click();
+  await page.click('#crate-btn');
+  await expect(page.locator('.lucky-vfx')).toHaveText('Lucky!');
+  await page.evaluate(() => { window.__TEST_FORCE_SPAWN_STAGE = 4; });
+  await page.click('#crate-btn');
+  await expect(page.locator('.lucky-vfx').last()).toHaveText('Super Lucky!');
+});
+
 test('the world reset button only appears for the admin account', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);

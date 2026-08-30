@@ -1,6 +1,13 @@
 // Puzzle session: merge identical items up the chain until one Mature Tree exists.
 // Pure state lives on the instance; DOM rendering is in render().
 
+// Rare crate drops get a floating celebration
+const LUCKY_VFX = {
+  3: ['Lucky!', '#ffd93d'],
+  4: ['Super Lucky!', '#ff9f43'],
+  5: ['Mega Lucky!', '#c77dff']
+};
+
 class Puzzle {
   constructor(species, { onWin, onLose, onQuit, onSpawn, spawnWeights, spawnBudget, tutor = true, onTutorComplete, board }) {
     this.species = species;
@@ -130,7 +137,25 @@ class Puzzle {
     if (this.onSpawn) this.onSpawn();
     this.render();
     this.flyFromCrate(idx, stage);
+    if (LUCKY_VFX[stage]) {
+      setTimeout(() => this.luckyVfx(idx, stage), 400); // as the item lands
+    }
     this.checkLoss();
+  }
+
+  luckyVfx(idx, stage) {
+    const cell = this.boardEl.querySelector(`[data-idx="${idx}"]`);
+    if (!cell) return;
+    const r = cell.getBoundingClientRect();
+    const [text, color] = LUCKY_VFX[stage];
+    const el = document.createElement('div');
+    el.className = 'lucky-vfx';
+    el.textContent = text;
+    el.style.color = color;
+    el.style.left = (r.left + r.width / 2) + 'px';
+    el.style.top = (r.top + r.height * 0.3) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1100);
   }
 
   // The spawned item pops out of the crate and arcs onto its cell.

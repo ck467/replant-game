@@ -493,6 +493,28 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .world-dead .critter { display: none; } /* no life left in a dead world */
 
+/* "Lucky!" floating text for rare crate drops */
+.lucky-vfx {
+  position: fixed;
+  z-index: 27;
+  pointer-events: none;
+  font-weight: bold;
+  font-size: 1.45rem;
+  white-space: nowrap;
+  text-shadow:
+    2px 0 0 var(--wood-edge), -2px 0 0 var(--wood-edge),
+    0 2px 0 var(--wood-edge), 0 -2px 0 var(--wood-edge),
+    2px 2px 0 var(--wood-edge), -2px -2px 0 var(--wood-edge),
+    2px -2px 0 var(--wood-edge), -2px 2px 0 var(--wood-edge);
+  animation: lucky-pop 1s ease-out forwards;
+}
+@keyframes lucky-pop {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  20% { transform: translate(-50%, -50%) scale(1.25) rotate(-4deg); opacity: 1; }
+  35% { transform: translate(-50%, -50%) scale(1) rotate(2deg); opacity: 1; }
+  100% { transform: translate(-50%, calc(-50% - 36px)) scale(1); opacity: 0; }
+}
+
 /* Tree-complete confetti, bursting from the winning cell */
 .confetti { position: fixed; z-index: 26; pointer-events: none; }
 .confetti span {
