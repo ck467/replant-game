@@ -107,6 +107,7 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
   const acc = await page.evaluate(() => JSON.parse(localStorage.getItem('replant_account_v1')));
   expect(acc.tutorDone).toBe(true);
   await page.click('#puzzle-quit');
+  await page.click('#overlay-btn2'); // confirm quitting the live run
   await page.locator('.patch.barren').first().click();
   await expect(page.locator('#puzzle-board')).toBeVisible();
   await page.waitForTimeout(600);
@@ -159,25 +160,31 @@ test('a qualifying run restores the tapped patch with your avatar', async ({ pag
   const tapped = page.locator(`.patch[data-map-idx="${target}"]`);
   await expect(tapped).toHaveClass(/green/);
   await expect(tapped).toHaveAttribute('title', /Restored by Planter/);
-  // All-time tab counts the grown tree…
-  await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
-  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1');
-  // …and Today's race tab ranks the qualifier by time
-  await page.click('#tab-runs');
+  // Returning from a run opens the leaderboard on Today's race
+  await expect(page.locator('#leaderboard')).toHaveClass(/open/);
+  await expect(page.locator('#tab-runs')).toHaveClass(/active/);
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
+  // …and the All-time tab counts the grown tree
   await page.click('#tab-trees');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1');
 });
 
 test('quitting or falling short restores nothing on the map', async ({ page }) => {
   await freshGame(page, { forceStage: 4 });
   await enterMap(page);
   const greenBefore = await page.locator('.patch.green').count();
-  // Quit mid-run: no restoration
+  // Quit mid-run: a warning first ("keep playing" resumes), then no restoration
   await page.locator('.patch.barren').first().click();
   await winChallengeTree(page);
   await expect(page.locator('#school-trees')).toHaveText('🌳 1/5', { timeout: 5000 });
   await page.click('#puzzle-quit');
+  await expect(page.locator('#overlay-title')).toContainText('Leave the run');
+  await page.click('#overlay-btn'); // keep playing — still in the run
+  await expect(page.locator('#puzzle-board')).toBeVisible();
+  await page.click('#puzzle-quit');
+  await page.click('#overlay-btn2'); // really quit
+  await expect(page.locator('#world-map')).toBeVisible();
   await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
   // Timing out below the goal: progress shown, still no restoration
   await shortClock(page, 3000);

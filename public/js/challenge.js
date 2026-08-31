@@ -17,10 +17,22 @@ class Challenge {
     this.hud = document.getElementById('school-hud');
     this.timerEl = document.getElementById('school-timer');
     this.treesEl = document.getElementById('school-trees');
-    // The puzzle owns the ← button while it exists; during the celebration
-    // window (between trees) the run itself must answer it
+    // The run owns the ← button: quitting a live run needs a confirmation
     document.getElementById('puzzle-quit').addEventListener('click', () => {
-      if (this.running && !this.puzzle) this.abort();
+      if (!this.running) return;
+      if (!this.deadline) { this.abort(); return; } // no crate opened yet — nothing at stake
+      this.confirmQuit();
+    });
+  }
+
+  confirmQuit() {
+    this.showOverlay({
+      title: '🚪 Leave the run?',
+      body: 'The timer is still going! If you quit now, no patch gets restored and your trees are lost.',
+      buttonText: '🌱 Keep playing',
+      onButton: () => {},
+      button2Text: '🗺️ Quit',
+      onButton2: () => this.abort()
     });
   }
 
@@ -60,8 +72,7 @@ class Challenge {
         if (!this.deadline) this.deadline = Date.now() + CONFIG.CHALLENGE.TIME_MS;
       },
       onWin: () => this.treeWon(),
-      onLose: () => {}, // unlimited spawns: only the clock can end the run
-      onQuit: () => this.abort()
+      onLose: () => {} // unlimited spawns: only the clock can end the run
     });
   }
 
@@ -163,7 +174,12 @@ class Challenge {
           `${rankLine} 🌱 In real life: ${solution}!`,
       celebrate: success,
       buttonText: '🗺️ Back to map',
-      onButton: () => this.showScreen('map-screen')
+      onButton: () => {
+        // Back on the map, show them where they landed in today's race
+        this.showScreen('map-screen');
+        setBoardTab('runs');
+        document.getElementById('leaderboard').classList.add('open');
+      }
     });
   }
 }

@@ -38,10 +38,7 @@ class Puzzle {
     this.crateHandler = () => this.spawn();
     this.crateBtn.addEventListener('click', this.crateHandler);
 
-    this.quitBtn = document.getElementById('puzzle-quit');
-    this.quitHandler = () => { this.teardown(); this.onQuit(); };
-    this.quitBtn.addEventListener('click', this.quitHandler);
-
+    // The ← button is owned by the Challenge (it confirms before quitting)
     this.recipeBtn = document.getElementById('recipe-btn');
     this.recipeHandler = () => this.showRecipe();
     this.recipeBtn.addEventListener('click', this.recipeHandler);
@@ -51,7 +48,6 @@ class Puzzle {
 
   teardown() {
     this.crateBtn.removeEventListener('click', this.crateHandler);
-    this.quitBtn.removeEventListener('click', this.quitHandler);
     this.recipeBtn.removeEventListener('click', this.recipeHandler);
     window.removeEventListener('pointermove', this.dragMoveHandler);
     window.removeEventListener('pointerup', this.dragEndHandler);
