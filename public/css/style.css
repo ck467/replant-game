@@ -124,6 +124,15 @@ body:has(#puzzle-screen.active) {
   margin-top: 16px;
 }
 .welcome-msg { font-weight: bold; font-size: 1.2rem; }
+.credit {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: bold;
+  line-height: 1.45;
+  color: var(--wood-mid);
+  flex: none;
+}
 #switch-btn { margin-top: 14px; }
 
 /* Restored patches wear their planter's portrait */
