@@ -139,29 +139,55 @@ test('the world reset button only appears for the admin account', async ({ page 
   await expect(page.locator('#reset-btn')).toBeVisible();
 });
 
-test('a run started from a dead tree restores that tree first, with your avatar', async ({ page }) => {
+test('a qualifying run restores the tapped patch with your avatar', async ({ page }) => {
   await freshGame(page, { forceStage: 4, name: 'Planter' });
   await enterMap(page);
   await shortClock(page, 3500);
   const target = await page.locator('.patch.barren').first().getAttribute('data-map-idx');
   await page.locator('.patch.barren').first().click();
+  await page.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 1; }); // qualify with one tree
   await winChallengeTree(page);
-  await expect(page.locator('.confetti span')).toHaveCount(16); // burst at the winning cell
-  await expect(page.locator('#school-trees')).toHaveText('🌳 1/5', { timeout: 5000 });
+  await expect(page.locator('.confetti span').first()).toBeAttached(); // burst at the winning cell
+  await expect(page.locator('#school-trees')).toHaveText('🌳 1/1', { timeout: 5000 });
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
-  await page.click('#overlay-btn2'); // back to map
+  // The juicy success modal announces the restoration; no Play again button
+  await expect(page.locator('#overlay-title')).toContainText('Patch restored, Planter');
+  await expect(page.locator('.overlay-card.celebrate')).toBeVisible();
+  await expect(page.locator('#overlay-btn2')).toBeHidden();
+  await page.click('#overlay-btn'); // back to map
   // The tapped dead tree is now alive and wears the planter's portrait
   const tapped = page.locator(`.patch[data-map-idx="${target}"]`);
   await expect(tapped).toHaveClass(/green/);
   await expect(tapped).toHaveAttribute('title', /Restored by Planter/);
-  // All-time tab counts the tree…
+  // All-time tab counts the grown tree…
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1');
-  // …and Today's race tab shows the run's progress toward the 5-tree goal
+  // …and Today's race tab ranks the qualifier by time
   await page.click('#tab-runs');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
-  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1/5');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
   await page.click('#tab-trees');
+});
+
+test('quitting or falling short restores nothing on the map', async ({ page }) => {
+  await freshGame(page, { forceStage: 4 });
+  await enterMap(page);
+  const greenBefore = await page.locator('.patch.green').count();
+  // Quit mid-run: no restoration
+  await page.locator('.patch.barren').first().click();
+  await winChallengeTree(page);
+  await expect(page.locator('#school-trees')).toHaveText('🌳 1/5', { timeout: 5000 });
+  await page.click('#puzzle-quit');
+  await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
+  // Timing out below the goal: progress shown, still no restoration
+  await shortClock(page, 3000);
+  await page.locator('.patch.barren').first().click();
+  await winChallengeTree(page);
+  await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('#overlay-body')).toContainText('Planted: 1');
+  await expect(page.locator('#overlay-btn2')).toBeHidden(); // no Play again
+  await page.click('#overlay-btn');
+  await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
 });
 
 test('beating the goal keeps going, and leftover items carry into the next board', async ({ page }) => {
@@ -194,10 +220,10 @@ test('beating the goal keeps going, and leftover items carry into the next board
   await pair.nth(1).click();
   await expect(page.locator('#school-trees')).toHaveText('🌳 2/1', { timeout: 5000 });
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 12000 });
-  await expect(page.locator('#overlay-title')).toContainText('Amazing, Champ');
-  await expect(page.locator('#overlay-body')).toContainText('2 trees');
+  await expect(page.locator('#overlay-title')).toContainText('Patch restored, Champ');
+  await expect(page.locator('#overlay-body')).toContainText('back to life');
   // Today's race ranks the goal-reacher by time
-  await page.click('#overlay-btn2'); // back to map
+  await page.click('#overlay-btn'); // back to map
   await page.click('#tab-runs');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Champ');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
@@ -284,26 +310,17 @@ test('world state survives a page reload (lives on the server)', async ({ page }
   expect(gridAfter).toBe(gridBefore);
 });
 
-test('running out of time below the goal records a partial run', async ({ page }) => {
-  await freshGame(page, { forceStage: 4 });
-  await enterMap(page);
-  // Long enough for one tree (clicks + 700ms win celebration), far below the goal of 7
-  await shortClock(page, 3000);
-  await page.locator('.patch.barren').first().click();
-  await winChallengeTree(page);
-  await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
-  await expect(page.locator('#overlay-title')).toContainText("Time's up");
-  await expect(page.locator('#overlay-body')).toContainText('1 tree');
-});
-
-test('leaderboard ranks by total trees and updates live', async ({ page }) => {
+test('leaderboard ranks by total trees grown and updates live', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
-  await page.evaluate(() => {
-    const barren = worldMap.grid.map((v, i) => v === 'b' ? i : -1).filter(i => i >= 0);
-    window.__socket.emit('restore', { idx: barren[0], name: 'One', avatar: 1 });
-    window.__socket.emit('restore', { idx: barren[1], name: 'Two', avatar: 2 });
-    window.__socket.emit('restore', { idx: barren[2], name: 'Two', avatar: 2 });
+  await page.evaluate(async () => {
+    const post = (b) => fetch('/api/challenge/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b)
+    });
+    await post({ name: 'One', avatar: 1, trees: 1, reached: false, timeMs: 120000 });
+    await post({ name: 'Two', avatar: 2, trees: 3, reached: false, timeMs: 120000 });
   });
   await expect(page.locator('#board-rows .board-row')).toHaveCount(2);
   await expect(page.locator('#board-rows .board-row').nth(0)).toContainText('Two');
@@ -346,6 +363,7 @@ test('two players share one world: a restore by one appears for the other', asyn
 
   const greenOnB = await pageB.locator('.patch.green').count();
   await pageA.locator('.patch.barren').first().click();
+  await pageA.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 1; }); // qualify with one tree
   await winChallengeTree(pageA);
 
   // Player B sees the patch Alpha restored — with Alpha's badge — live

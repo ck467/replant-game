@@ -326,25 +326,7 @@ class Puzzle {
     const cell = this.boardEl.querySelector(`[data-idx="${idx}"]`);
     if (!cell) return;
     const r = cell.getBoundingClientRect();
-    const burst = document.createElement('div');
-    burst.className = 'confetti';
-    burst.style.left = (r.left + r.width / 2) + 'px';
-    burst.style.top = (r.top + r.height / 2) + 'px';
-    const colors = ['#ff5252', '#ffd93d', '#6bcb77', '#4d96ff', '#ff9f43', '#e878d2'];
-    for (let i = 0; i < 16; i++) {
-      const p = document.createElement('span');
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 30 + Math.random() * 55;
-      p.style.background = colors[i % colors.length];
-      p.style.width = p.style.height = (5 + Math.random() * 5) + 'px';
-      p.style.setProperty('--cx', Math.round(Math.cos(ang) * dist) + 'px');
-      p.style.setProperty('--cy', Math.round(Math.sin(ang) * dist - 40) + 'px');
-      p.style.setProperty('--cr', Math.round(Math.random() * 720 - 360) + 'deg');
-      p.style.animationDelay = (Math.random() * 100) + 'ms';
-      burst.appendChild(p);
-    }
-    document.body.appendChild(burst);
-    setTimeout(() => burst.remove(), 1300);
+    confettiAt(r.left + r.width / 2, r.top + r.height / 2);
   }
 
   // The finished tree lifts off the plot and flies into the 🌳 counter

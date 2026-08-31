@@ -11,7 +11,7 @@ const PLAYERS_FILE = process.env.PLAYERS_FILE || path.join(__dirname, 'players.j
 // Authoritative world settings (client gets these with the map payload)
 const MAP_COLS = 12;
 const MAP_ROWS = 8;
-const SPREAD_INTERVAL_MS = 45000;
+const SPREAD_INTERVAL_MS = 90000; // rebalanced: a run now restores ONE patch
 const AVATAR_COUNT = 20;
 
 const app = express();
@@ -132,6 +132,7 @@ app.post('/api/challenge/run', (req, res) => {
   const timeMs = Math.max(0, Math.min(3600000, parseInt(req.body.timeMs, 10) || 0));
   const run = { trees, timeMs, reached: req.body.reached === true, day: today() };
   const player = getPlayer(name, avatar);
+  player.trees += trees; // every tree grown counts toward the lifetime tab
   const best = player.bestRun;
   if (!best || best.day !== run.day || runBetter(run, best)) {
     player.bestRun = run;
@@ -147,14 +148,15 @@ app.post('/api/challenge/run', (req, res) => {
 
 // ---------- World changes ----------
 
+// Greens a patch in the player's name. Lifetime tree counts come from
+// finished runs (the /api/challenge/run POST), not from map changes.
 function restorePatch(idx, name, avatar) {
   if (world.grid[idx] === 'g') return false; // already restored
   world.grid[idx] = 'g';
   const owner = { name, avatar };
   world.owners[idx] = owner;
   saveWorld();
-  const player = getPlayer(name, avatar);
-  player.trees++;
+  getPlayer(name, avatar); // ensure they exist on the board
   savePlayers();
   io.emit('patch', { idx, state: 'g', cause: 'restore', owner });
   broadcastLeaderboard();

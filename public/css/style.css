@@ -888,6 +888,22 @@ body:has(#map-screen.active) { background: #3abe41; }
   animation: popIn 0.35s ease;
 }
 .overlay-card h2 { margin-bottom: 12px; }
+/* Big-win juice: golden glow + bouncy entrance */
+.overlay-card.celebrate {
+  animation: celebrate-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: inset 0 0 0 2px #fff3d6, 0 0 0 4px #ffd93d, 0 0 26px rgba(255, 217, 61, 0.75), 0 6px 0 rgba(0, 0, 0, 0.3);
+}
+.overlay-card.celebrate h2 { animation: celebrate-title 0.9s ease 0.2s both; }
+@keyframes celebrate-pop {
+  0% { transform: scale(0.4) rotate(-4deg); }
+  60% { transform: scale(1.08) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes celebrate-title {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
 .overlay-card p { line-height: 1.5; }
 
 /* One toast for everything: a wood sign as wide as the game board, sitting

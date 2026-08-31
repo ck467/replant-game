@@ -17,6 +17,11 @@ class Challenge {
     this.hud = document.getElementById('school-hud');
     this.timerEl = document.getElementById('school-timer');
     this.treesEl = document.getElementById('school-trees');
+    // The puzzle owns the ← button while it exists; during the celebration
+    // window (between trees) the run itself must answer it
+    document.getElementById('puzzle-quit').addEventListener('click', () => {
+      if (this.running && !this.puzzle) this.abort();
+    });
   }
 
   // targetPatch: when the run starts from tapping a patch, the first tree
@@ -65,18 +70,18 @@ class Challenge {
     const grown = this.puzzle; // keeps the finished board (and its tree) on screen
     this.puzzle = null;
     this.treesDone++;
-    const acc = this.getAccount();
-    if (this.targetPatch != null && this.isPatchBarren(this.targetPatch)) {
-      this.socket.emit('restore', { idx: this.targetPatch, name: acc.name, avatar: acc.avatar });
-    } else {
-      this.socket.emit('challenge-tree', { name: acc.name, avatar: acc.avatar });
-    }
-    this.targetPatch = null;
-    // The clock always runs its course — beating the goal just keeps counting
+    // The map only changes when the run QUALIFIES: the 5th tree restores
+    // the tapped patch. Quitting or falling short restores nothing.
     if (this.treesDone === CONFIG.CHALLENGE.GOAL_TREES) {
+      const acc = this.getAccount();
+      if (this.targetPatch != null && this.isPatchBarren(this.targetPatch)) {
+        this.socket.emit('restore', { idx: this.targetPatch, name: acc.name, avatar: acc.avatar });
+      } else {
+        this.socket.emit('challenge-tree', { name: acc.name, avatar: acc.avatar });
+      }
       // Today's leaderboard ranks by how fast you reached the goal
       this.goalTimeMs = CONFIG.CHALLENGE.TIME_MS - Math.max(0, this.deadline - Date.now());
-      this.toast(`🏆 Goal reached — ${this.treesDone} trees! Keep planting!`);
+      this.toast(`🏆 ${this.treesDone} trees — you restored a patch! Keep planting!`);
     } else {
       this.toast(`🌳 Tree ${this.treesDone}/${CONFIG.CHALLENGE.GOAL_TREES} planted — keep going!`);
     }
@@ -150,13 +155,15 @@ class Challenge {
 
     const solution = CONFIG.SOLUTIONS[Math.floor(Math.random() * CONFIG.SOLUTIONS.length)];
     this.showOverlay({
-      title: success ? `🏆 Amazing, ${acc.name}!` : "⏰ Time's up!",
-      body: `You planted ${this.treesDone} tree${this.treesDone === 1 ? '' : 's'}. Every tree counts!${rankLine}` +
-        ` 🌱 In real life: ${solution}!`,
-      buttonText: '🔁 Play again',
-      onButton: () => this.start(),
-      button2Text: '🗺️ Back to map',
-      onButton2: () => this.showScreen('map-screen')
+      title: success ? `🌍 Patch restored, ${acc.name}!` : "⏰ Time's up!",
+      body: success
+        ? `Your ${CONFIG.CHALLENGE.GOAL_TREES} trees brought a patch of the forest back to life` +
+          ` in ${formatTime(this.goalTimeMs)}!${rankLine} 🌱 In real life: ${solution}!`
+        : `🌳 Planted: ${this.treesDone}. Reach ${CONFIG.CHALLENGE.GOAL_TREES} trees to restore a patch!` +
+          `${rankLine} 🌱 In real life: ${solution}!`,
+      celebrate: success,
+      buttonText: '🗺️ Back to map',
+      onButton: () => this.showScreen('map-screen')
     });
   }
 }

@@ -48,9 +48,44 @@ function toast(text, ms = 2500) {
   toast.timer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-function showOverlay({ title, body, buttonText, onButton, list, button2Text, onButton2 }) {
+// A burst of confetti pieces at any screen position (shared celebration VFX)
+function confettiAt(x, y) {
+  const burst = document.createElement('div');
+  burst.className = 'confetti';
+  burst.style.left = x + 'px';
+  burst.style.top = y + 'px';
+  const colors = ['#ff5252', '#ffd93d', '#6bcb77', '#4d96ff', '#ff9f43', '#e878d2'];
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('span');
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 55;
+    p.style.background = colors[i % colors.length];
+    p.style.width = p.style.height = (5 + Math.random() * 5) + 'px';
+    p.style.setProperty('--cx', Math.round(Math.cos(ang) * dist) + 'px');
+    p.style.setProperty('--cy', Math.round(Math.sin(ang) * dist - 40) + 'px');
+    p.style.setProperty('--cr', Math.round(Math.random() * 720 - 360) + 'deg');
+    p.style.animationDelay = (Math.random() * 100) + 'ms';
+    burst.appendChild(p);
+  }
+  document.body.appendChild(burst);
+  setTimeout(() => burst.remove(), 1300);
+}
+
+// A shower of bursts for the big win
+function confettiShower() {
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => confettiAt(
+      window.innerWidth * (0.15 + Math.random() * 0.7),
+      window.innerHeight * (0.12 + Math.random() * 0.4)
+    ), i * 160);
+  }
+}
+
+function showOverlay({ title, body, buttonText, onButton, list, button2Text, onButton2, celebrate }) {
   document.getElementById('overlay-title').textContent = title;
   document.getElementById('overlay-body').textContent = body;
+  document.querySelector('#result-overlay .overlay-card').classList.toggle('celebrate', !!celebrate);
+  if (celebrate) confettiShower();
 
   const board = document.getElementById('overlay-board');
   board.hidden = !list || list.length === 0;
