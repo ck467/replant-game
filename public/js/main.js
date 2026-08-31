@@ -82,10 +82,43 @@ function formatRunTime(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-function renderLeaderboard(top) {
+// Two views over the same data: lifetime trees, and today's race to the goal
+let boardPlayers = [];
+let boardTab = 'trees';
+
+function localToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function renderLeaderboard(players) {
+  if (players) boardPlayers = players;
   const rows = document.getElementById('board-rows');
-  document.getElementById('board-empty').hidden = top.length > 0;
-  rows.replaceChildren(...top.map(p => {
+  const empty = document.getElementById('board-empty');
+
+  let list, statsFor;
+  if (boardTab === 'trees') {
+    list = boardPlayers.slice(0, 10); // server pre-sorts by lifetime trees
+    statsFor = p => `🌳 ${p.trees}`;
+    empty.textContent = 'No trees planted yet — be the first!';
+  } else {
+    const day = localToday();
+    list = boardPlayers
+      .filter(p => p.bestRun && p.bestRun.day === day)
+      .sort((a, b) => {
+        const x = a.bestRun, y = b.bestRun;
+        if (x.reached !== y.reached) return x.reached ? -1 : 1;
+        if (x.reached) return x.timeMs - y.timeMs;
+        return y.trees - x.trees;
+      })
+      .slice(0, 10);
+    statsFor = p => p.bestRun.reached
+      ? `⏱️ ${formatRunTime(p.bestRun.timeMs)}`
+      : `🌳 ${Math.min(p.bestRun.trees, CONFIG.CHALLENGE.GOAL_TREES)}/${CONFIG.CHALLENGE.GOAL_TREES}`;
+    empty.textContent = 'No runs today — race to 5 trees!';
+  }
+
+  empty.hidden = list.length > 0;
+  rows.replaceChildren(...list.map(p => {
     const li = document.createElement('li');
     li.className = 'board-row' + (account && p.name === account.name ? ' me' : '');
 
@@ -99,12 +132,18 @@ function renderLeaderboard(top) {
 
     const stats = document.createElement('span');
     stats.className = 'board-stats';
-    stats.textContent = `🌳 ${p.trees}` +
-      (p.bestRun ? ` · ⏱️ ${p.bestRun.trees}/${formatRunTime(p.bestRun.timeMs)}` : '');
+    stats.textContent = statsFor(p);
 
     li.append(avatar, name, stats);
     return li;
   }));
+}
+
+function setBoardTab(tab) {
+  boardTab = tab;
+  document.getElementById('tab-trees').classList.toggle('active', tab === 'trees');
+  document.getElementById('tab-runs').classList.toggle('active', tab === 'runs');
+  renderLeaderboard();
 }
 
 // ----- Account entry -----
@@ -198,6 +237,8 @@ function init() {
   document.getElementById('board-toggle').addEventListener('click', () => {
     document.getElementById('leaderboard').classList.toggle('open');
   });
+  document.getElementById('tab-trees').addEventListener('click', () => setBoardTab('trees'));
+  document.getElementById('tab-runs').addEventListener('click', () => setBoardTab('runs'));
   // Tapping anywhere outside the open drawer dismisses it
   document.addEventListener('pointerdown', e => {
     const drawer = document.getElementById('leaderboard');

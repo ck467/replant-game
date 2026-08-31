@@ -74,7 +74,7 @@ test('tapping a dead tree starts a timed run; living forest is scenery', async (
   await expect(page.locator('#puzzle-goal')).toContainText('Grow Mature');
   await expect(page.locator('#school-hud')).toBeVisible();
   await expect(page.locator('#school-timer')).toHaveText('2:00'); // clock waits for first crate
-  await expect(page.locator('#school-trees')).toHaveText('🌳 0/7');
+  await expect(page.locator('#school-trees')).toHaveText('🌳 0/5');
   await expect(page.locator('#crate-count')).toBeHidden();        // no crate budget anywhere
 });
 
@@ -147,17 +147,21 @@ test('a run started from a dead tree restores that tree first, with your avatar'
   await page.locator('.patch.barren').first().click();
   await winChallengeTree(page);
   await expect(page.locator('.confetti span')).toHaveCount(16); // burst at the winning cell
-  await expect(page.locator('#school-trees')).toHaveText('🌳 1/7', { timeout: 5000 });
+  await expect(page.locator('#school-trees')).toHaveText('🌳 1/5', { timeout: 5000 });
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
   await page.click('#overlay-btn2'); // back to map
   // The tapped dead tree is now alive and wears the planter's portrait
   const tapped = page.locator(`.patch[data-map-idx="${target}"]`);
   await expect(tapped).toHaveClass(/green/);
   await expect(tapped).toHaveAttribute('title', /Restored by Planter/);
-  // …and the live leaderboard counts the tree plus the recorded run
+  // All-time tab counts the tree…
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1');
-  await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️ 1/');
+  // …and Today's race tab shows the run's progress toward the 5-tree goal
+  await page.click('#tab-runs');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1/5');
+  await page.click('#tab-trees');
 });
 
 test('beating the goal keeps going, and leftover items carry into the next board', async ({ page }) => {
@@ -192,6 +196,11 @@ test('beating the goal keeps going, and leftover items carry into the next board
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 12000 });
   await expect(page.locator('#overlay-title')).toContainText('Amazing, Champ');
   await expect(page.locator('#overlay-body')).toContainText('2 trees');
+  // Today's race ranks the goal-reacher by time
+  await page.click('#overlay-btn2'); // back to map
+  await page.click('#tab-runs');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('Champ');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
 });
 
 test('dragging an item onto its match merges them', async ({ page }) => {

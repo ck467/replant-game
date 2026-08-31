@@ -153,7 +153,25 @@ body:has(#puzzle-screen.active) {
   box-shadow: inset 0 0 0 2px #fff3d6, 0 4px 0 rgba(0, 0, 0, 0.3);
   color: var(--ink-wood);
 }
-.leaderboard .board-title { margin: 0 0 10px; text-align: center; color: var(--wood-mid); }
+.leaderboard .board-title { margin: 0 0 8px; text-align: center; color: var(--wood-mid); }
+.board-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.board-tab {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 6px 4px;
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--wood-mid);
+  border: 2px solid var(--wood-mid);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.board-tab.active {
+  background: var(--grass-dark);
+  color: #fff;
+  border-color: var(--wood-edge);
+}
 .board-rows {
   list-style: none;
   padding: 0;

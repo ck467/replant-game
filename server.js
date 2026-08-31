@@ -91,40 +91,57 @@ function getPlayer(name, avatar) {
 
 function rankedPlayers() {
   return Object.values(players).sort((a, b) =>
-    b.trees - a.trees ||
-    (b.bestRun ? b.bestRun.trees : -1) - (a.bestRun ? a.bestRun.trees : -1) ||
-    (a.bestRun ? a.bestRun.timeMs : Infinity) - (b.bestRun ? b.bestRun.timeMs : Infinity) ||
-    a.name.localeCompare(b.name)
+    b.trees - a.trees || a.name.localeCompare(b.name)
   );
 }
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// A reaches the goal faster, or plants more trees if neither reached it
+function runBetter(a, b) {
+  if (!b) return true;
+  if (a.reached !== b.reached) return a.reached;
+  if (a.reached) return a.timeMs < b.timeMs;
+  return a.trees > b.trees;
+}
+
+// Today's run ranking: goal-reachers by speed, then the rest by tree count
+function rankedRunsToday() {
+  const day = today();
+  return Object.values(players)
+    .filter(p => p.bestRun && p.bestRun.day === day)
+    .sort((a, b) => runBetter(a.bestRun, b.bestRun) ? -1 : 1);
+}
+
 function broadcastLeaderboard() {
-  io.emit('leaderboard', rankedPlayers().slice(0, 10));
+  io.emit('leaderboard', rankedPlayers().slice(0, 50));
 }
 
 app.get('/api/leaderboard', (req, res) => {
-  res.json(rankedPlayers().slice(0, 10));
+  res.json(rankedPlayers().slice(0, 50));
 });
 
-// A finished timed-challenge run: record the player's best
+// A finished timed-challenge run: record the player's best FOR TODAY
 app.post('/api/challenge/run', (req, res) => {
   const name = cleanName(req.body.name);
   if (!name) return res.status(400).json({ error: 'name required' });
   const avatar = cleanAvatar(req.body.avatar);
   const trees = Math.max(0, Math.min(99, parseInt(req.body.trees, 10) || 0));
   const timeMs = Math.max(0, Math.min(3600000, parseInt(req.body.timeMs, 10) || 0));
+  const run = { trees, timeMs, reached: req.body.reached === true, day: today() };
   const player = getPlayer(name, avatar);
   const best = player.bestRun;
-  if (!best || trees > best.trees || (trees === best.trees && timeMs < best.timeMs)) {
-    player.bestRun = { trees, timeMs };
+  if (!best || best.day !== run.day || runBetter(run, best)) {
+    player.bestRun = run;
   }
   savePlayers();
   broadcastLeaderboard();
-  const ranked = rankedPlayers();
+  const ranked = rankedRunsToday();
   res.json({
     rank: ranked.findIndex(p => p.name === name) + 1,
-    total: ranked.length,
-    top: ranked.slice(0, 10)
+    total: ranked.length
   });
 });
 

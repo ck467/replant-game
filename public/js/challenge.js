@@ -25,6 +25,7 @@ class Challenge {
     this.targetPatch = targetPatch;
     this.running = true;
     this.treesDone = 0;
+    this.goalTimeMs = null;
     this.deadline = null; // clock starts on the first crate open
     this.hud.hidden = false;
     this.renderHud(CONFIG.CHALLENGE.TIME_MS);
@@ -73,6 +74,8 @@ class Challenge {
     this.targetPatch = null;
     // The clock always runs its course — beating the goal just keeps counting
     if (this.treesDone === CONFIG.CHALLENGE.GOAL_TREES) {
+      // Today's leaderboard ranks by how fast you reached the goal
+      this.goalTimeMs = CONFIG.CHALLENGE.TIME_MS - Math.max(0, this.deadline - Date.now());
       this.toast(`🏆 Goal reached — ${this.treesDone} trees! Keep planting!`);
     } else {
       this.toast(`🌳 Tree ${this.treesDone}/${CONFIG.CHALLENGE.GOAL_TREES} planted — keep going!`);
@@ -137,7 +140,8 @@ class Challenge {
           name: acc.name,
           avatar: acc.avatar,
           trees: this.treesDone,
-          timeMs: CONFIG.CHALLENGE.TIME_MS
+          reached: success,
+          timeMs: success ? this.goalTimeMs : CONFIG.CHALLENGE.TIME_MS
         })
       });
       const data = await res.json();

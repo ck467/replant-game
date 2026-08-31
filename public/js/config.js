@@ -16,7 +16,7 @@ const CONFIG = {
   // Timed run: the goal is GOAL_TREES full trees, but the clock always runs
   // its full TIME_MS — players who beat the goal keep planting past it.
   CHALLENGE: {
-    GOAL_TREES: 7,
+    GOAL_TREES: 5,
     TIME_MS: 120000
   },
 
