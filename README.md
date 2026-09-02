@@ -49,10 +49,15 @@ Everything lives in `public/js/config.js`:
   patch; the ⏱️ button starts a run that greens random patches. Every
   restored patch is stamped with your avatar (hover shows "Restored by ___")
   and adds to your leaderboard total. Tune in `CONFIG.CHALLENGE`.
-- **🏆 Top Planters leaderboard** — ranked by total trees, ties broken by
-  best challenge run. Always on screen on desktop; a drawer (🏆 button) on
-  small screens. Live-updates for everyone over Socket.IO. Player data
-  persists in `players.json` — delete it to clear the board for a new day.
+- **🏆 Patch Restorers leaderboard** — only players who have restored a
+  patch appear, ranked by patches restored, ties broken by fastest goal
+  time. Always on screen on desktop; a drawer (🏆 button) on small screens.
+  Live-updates for everyone over Socket.IO. Player data persists in
+  `players.json` — delete it to clear the board for a new day.
+- **One message band** — every message during a run (tutorial, tree
+  progress, a patch lost to the plague) shows on the wood sign between the
+  HUD and the board; between messages the sign cycles through the
+  deforestation facts from `CONFIG.IMPACTS`.
 
 ## Multiplayer
 

@@ -7,7 +7,9 @@ async function freshGame(page, opts = {}) {
   await page.request.post('/debug/reset');
   await page.addInitScript((o) => {
     if (o.account !== false) {
-      localStorage.setItem('replant_account_v1', JSON.stringify({ name: o.name || 'Tester', avatar: 3 }));
+      const acc = { name: o.name || 'Tester', avatar: 3 };
+      if (o.tutorDone) acc.tutorDone = true;
+      localStorage.setItem('replant_account_v1', JSON.stringify(acc));
     } else {
       localStorage.removeItem('replant_account_v1');
     }
@@ -160,14 +162,11 @@ test('a qualifying run restores the tapped patch with your avatar', async ({ pag
   const tapped = page.locator(`.patch[data-map-idx="${target}"]`);
   await expect(tapped).toHaveClass(/green/);
   await expect(tapped).toHaveAttribute('title', /Restored by Planter/);
-  // Returning from a run opens the leaderboard on Today's race
+  // Returning from a run opens the leaderboard: one patch, with the goal time
   await expect(page.locator('#leaderboard')).toHaveClass(/open/);
-  await expect(page.locator('#tab-runs')).toHaveClass(/active/);
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌍 1');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
-  // …and the All-time tab counts the grown tree
-  await page.click('#tab-trees');
-  await expect(page.locator('#board-rows .board-row').first()).toContainText('🌳 1');
 });
 
 test('quitting or falling short restores nothing on the map', async ({ page }) => {
@@ -195,6 +194,9 @@ test('quitting or falling short restores nothing on the map', async ({ page }) =
   await expect(page.locator('#overlay-btn2')).toBeHidden(); // no Play again
   await page.click('#overlay-btn');
   await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
+  // Only patch restorers make the leaderboard
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(0);
+  await expect(page.locator('#board-empty')).toBeVisible();
 });
 
 test('reaching the goal ends the run, and leftover items carry into the next board', async ({ page }) => {
@@ -233,11 +235,60 @@ test('reaching the goal ends the run, and leftover items carry into the next boa
   await expect(page.locator('#overlay-title')).toContainText('Patch restored, Champ');
   await expect(page.locator('#overlay-body')).toContainText('back to life');
   await expect(page.locator('#overlay-body')).toContainText('Your 2 trees');
-  // Today's race ranks the goal-reacher by time
+  // The board lists the restorer with their goal time
   await page.click('#overlay-btn'); // back to map
-  await page.click('#tab-runs');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Champ');
   await expect(page.locator('#board-rows .board-row').first()).toContainText('⏱️');
+});
+
+test('the crate stays open while a finished tree waits to fly off', async ({ page }) => {
+  await freshGame(page, { forceStage: 4, name: 'Busy' });
+  await enterMap(page);
+  await page.locator('.patch.barren').first().click();
+  await winChallengeTree(page);
+  await expect(page.locator('#puzzle-board .cell.stage-5')).toHaveCount(1);
+  // While the tree celebrates on its cell, the crate still works…
+  await page.click('#crate-btn');
+  await page.click('#crate-btn');
+  await expect(page.locator('#puzzle-board .cell.stage-4')).toHaveCount(2);
+  await expect(page.locator('#puzzle-board .cell.stage-5')).toHaveCount(1);
+  // …and so does merging, without touching the tree
+  const pair = page.locator('#puzzle-board .cell.stage-4');
+  await pair.nth(0).click();
+  await pair.nth(1).click();
+  await expect(page.locator('#school-trees')).toHaveText('🌳 2/4', { timeout: 5000 });
+  await expect(page.locator('#puzzle-board .cell.stage-5')).toHaveCount(2);
+  // Both trees fly into the counter and free their cells
+  await expect(page.locator('#puzzle-board .cell.stage-5')).toHaveCount(0, { timeout: 8000 });
+  await expect(page.locator('#puzzle-board .cell.filled')).toHaveCount(0);
+});
+
+test('during a run the band cycles deforestation facts between messages', async ({ page }) => {
+  await freshGame(page, { tutorDone: true }); // no coaching toasts in the way
+  await enterMap(page);
+  await page.locator('.patch.barren').first().click();
+  // No tutorial, no progress yet: the band shows a research fact
+  await expect(page.locator('#toast')).toContainText('When forests are cut down', { timeout: 4000 });
+  await expect(page.locator('#toast')).toHaveClass(/fact/);
+  await expect(page.locator('#toast')).toHaveClass(/over-board/);
+  // The band sits between the HUD and the board
+  const placed = await page.evaluate(() => {
+    const t = document.getElementById('toast').getBoundingClientRect();
+    const top = document.querySelector('.puzzle-top').getBoundingClientRect();
+    const board = document.getElementById('puzzle-board').getBoundingClientRect();
+    return t.top >= top.bottom - 1 && t.bottom <= board.top + 1;
+  });
+  expect(placed).toBe(true);
+  // A patch lost to the plague shows in the same band, replacing the fact
+  await page.request.post('/debug/spread');
+  await expect(page.locator('#toast')).toContainText('Deforestation spread', { timeout: 6000 });
+  await expect(page.locator('#toast')).not.toHaveClass(/fact/);
+  await expect(page.locator('#toast')).toHaveClass(/over-board/);
+  // Quitting the run stops the facts
+  await page.click('#puzzle-quit');
+  await expect(page.locator('#world-map')).toBeVisible();
+  await page.waitForTimeout(2000);
+  await expect(page.locator('#toast')).not.toHaveClass(/fact/);
 });
 
 test('dragging an item onto its match merges them', async ({ page }) => {
@@ -321,21 +372,28 @@ test('world state survives a page reload (lives on the server)', async ({ page }
   expect(gridAfter).toBe(gridBefore);
 });
 
-test('leaderboard ranks by total trees grown and updates live', async ({ page }) => {
+test('leaderboard lists patch restorers, most patches first, and updates live', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
   await page.evaluate(async () => {
+    const barren = [...document.querySelectorAll('.patch.barren')].map(p => +p.dataset.mapIdx);
     const post = (b) => fetch('/api/challenge/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(b)
     });
-    await post({ name: 'One', avatar: 1, trees: 1, reached: false, timeMs: 120000 });
-    await post({ name: 'Two', avatar: 2, trees: 3, reached: false, timeMs: 120000 });
+    // "Grower" planted trees but never reached the goal: not on the board
+    await post({ name: 'Grower', avatar: 1, trees: 3, reached: false, timeMs: 60000 });
+    window.__socket.emit('restore', { idx: barren[0], name: 'One', avatar: 1 });
+    window.__socket.emit('restore', { idx: barren[1], name: 'Two', avatar: 2 });
+    window.__socket.emit('restore', { idx: barren[2], name: 'Two', avatar: 2 });
+    await post({ name: 'One', avatar: 1, trees: 4, reached: true, timeMs: 41000 });
   });
   await expect(page.locator('#board-rows .board-row')).toHaveCount(2);
   await expect(page.locator('#board-rows .board-row').nth(0)).toContainText('Two');
+  await expect(page.locator('#board-rows .board-row').nth(0)).toContainText('🌍 2');
   await expect(page.locator('#board-rows .board-row').nth(1)).toContainText('One');
+  await expect(page.locator('#board-rows .board-row').nth(1)).toContainText('🌍 1 · ⏱️ 0:41');
 });
 
 test('leaderboard is pinned on desktop and a drawer on small screens', async ({ page }) => {

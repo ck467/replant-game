@@ -30,23 +30,67 @@ function updateHud() {
   }
 }
 
-function toast(text, ms = 2500) {
+// Every message — tutorial, tree progress, a patch lost to the plague —
+// goes through here. During play it sits in the open band between the
+// HUD and the board; on the map it floats near the lower third.
+function toast(text, ms = 2500, { fact = false } = {}) {
   const el = document.getElementById('toast');
   el.textContent = text;
-  // During play, the toast lives in the open area between the top UI and board
+  el.classList.toggle('fact', fact);
   const inPlay = document.getElementById('puzzle-screen').classList.contains('active');
   el.classList.toggle('over-board', inPlay);
+  el.classList.remove('compact');
   if (inPlay) {
     const top = document.querySelector('.puzzle-top').getBoundingClientRect();
     const board = document.getElementById('puzzle-board').getBoundingClientRect();
+    el.style.width = Math.round(board.width) + 'px'; // a sign as wide as the plot
+    // A long message on a short band shrinks rather than covering the board
+    if (el.offsetHeight > board.top - top.bottom - 6) el.classList.add('compact');
     el.style.top = Math.round((top.bottom + board.top) / 2) + 'px';
   } else {
     el.style.top = '';
+    el.style.width = '';
   }
   el.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('show'), ms);
+  toast.timer = setTimeout(() => {
+    el.classList.remove('show');
+    factTicker.schedule(1200); // the band goes back to cycling facts
+  }, ms);
 }
+
+// While a run is on and no message is showing, the band cycles through
+// the research: what deforestation does to the world.
+const factTicker = {
+  running: false,
+  timer: null,
+  order: [],
+  pos: 0,
+  start() {
+    this.running = true;
+    this.order = CONFIG.IMPACTS.map((_, i) => i).sort(() => Math.random() - 0.5);
+    this.pos = 0;
+    this.schedule(1500);
+  },
+  stop() {
+    this.running = false;
+    clearTimeout(this.timer);
+    const el = document.getElementById('toast');
+    if (el.classList.contains('fact')) el.classList.remove('show', 'fact');
+  },
+  schedule(ms) {
+    if (!this.running) return;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.next(), ms);
+  },
+  next() {
+    const el = document.getElementById('toast');
+    if (!this.running) return;
+    if (el.classList.contains('show') && !el.classList.contains('fact')) return; // a real message is up
+    const impact = CONFIG.IMPACTS[this.order[this.pos++ % this.order.length]];
+    toast(`🌍 When forests are cut down, ${impact}.`, 5000, { fact: true });
+  }
+};
 
 // A burst of confetti pieces at any screen position (shared celebration VFX)
 function confettiAt(x, y) {
@@ -117,40 +161,14 @@ function formatRunTime(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// Two views over the same data: lifetime trees, and today's race to the goal
-let boardPlayers = [];
-let boardTab = 'trees';
-
-function localToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
+// Players who have restored a patch: the server pre-sorts by patches, then
+// by fastest goal time.
 function renderLeaderboard(players) {
-  if (players) boardPlayers = players;
   const rows = document.getElementById('board-rows');
   const empty = document.getElementById('board-empty');
-
-  let list, statsFor;
-  if (boardTab === 'trees') {
-    list = boardPlayers.slice(0, 10); // server pre-sorts by lifetime trees
-    statsFor = p => `🌳 ${p.trees}`;
-    empty.textContent = 'No trees planted yet — be the first!';
-  } else {
-    const day = localToday();
-    list = boardPlayers
-      .filter(p => p.bestRun && p.bestRun.day === day)
-      .sort((a, b) => {
-        const x = a.bestRun, y = b.bestRun;
-        if (x.reached !== y.reached) return x.reached ? -1 : 1;
-        if (x.reached) return x.timeMs - y.timeMs;
-        return y.trees - x.trees;
-      })
-      .slice(0, 10);
-    statsFor = p => p.bestRun.reached
-      ? `⏱️ ${formatRunTime(p.bestRun.timeMs)}`
-      : `🌳 ${Math.min(p.bestRun.trees, CONFIG.CHALLENGE.GOAL_TREES)}/${CONFIG.CHALLENGE.GOAL_TREES}`;
-    empty.textContent = `No runs today — race to ${CONFIG.CHALLENGE.GOAL_TREES} trees!`;
-  }
+  const list = players.slice(0, 10);
+  const statsFor = p => `🌍 ${p.patches}` +
+    (p.bestTimeMs != null ? ` · ⏱️ ${formatRunTime(p.bestTimeMs)}` : '');
 
   empty.hidden = list.length > 0;
   rows.replaceChildren(...list.map(p => {
@@ -172,13 +190,6 @@ function renderLeaderboard(players) {
     li.append(avatar, name, stats);
     return li;
   }));
-}
-
-function setBoardTab(tab) {
-  boardTab = tab;
-  document.getElementById('tab-trees').classList.toggle('active', tab === 'trees');
-  document.getElementById('tab-runs').classList.toggle('active', tab === 'runs');
-  renderLeaderboard();
 }
 
 // ----- Account entry -----
@@ -272,8 +283,6 @@ function init() {
   document.getElementById('board-toggle').addEventListener('click', () => {
     document.getElementById('leaderboard').classList.toggle('open');
   });
-  document.getElementById('tab-trees').addEventListener('click', () => setBoardTab('trees'));
-  document.getElementById('tab-runs').addEventListener('click', () => setBoardTab('runs'));
   // Tapping anywhere outside the open drawer dismisses it
   document.addEventListener('pointerdown', e => {
     const drawer = document.getElementById('leaderboard');

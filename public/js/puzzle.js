@@ -23,6 +23,7 @@ class Puzzle {
     this.spawnCount = 0;
     this.selected = -1;
     this.finished = false;
+    this.inFlight = new Set(); // cells whose item is mid-air (hidden on the plot)
     this.tutorEnabled = tutor;
     this.onTutorComplete = onTutorComplete;
 
@@ -162,6 +163,7 @@ class Puzzle {
       return;
     }
     // Board state is already rendered; hide the item while its flyer travels
+    this.inFlight.add(idx);
     cell.classList.add('landing');
 
     const crateRect = this.crateBtn.getBoundingClientRect();
@@ -191,6 +193,7 @@ class Puzzle {
 
     hop.onfinish = () => {
       flyer.remove();
+      this.inFlight.delete(idx);
       // The board may have re-rendered mid-flight — re-query before revealing
       const landed = this.boardEl.querySelector(`[data-idx="${idx}"]`);
       if (landed) {
@@ -204,6 +207,7 @@ class Puzzle {
 
   dragStart(e, idx) {
     if (this.finished || this.board[idx] === 0) return;
+    if (this.board[idx] === CONFIG.CHAIN_LENGTH) return; // a finished tree stays put
     this.drag = { idx, startX: e.clientX, startY: e.clientY, ghost: null };
     this.dragMoveHandler = ev => this.dragMove(ev);
     this.dragEndHandler = ev => this.dragEnd(ev);
@@ -274,7 +278,8 @@ class Puzzle {
   tapCell(idx) {
     if (this.justDragged) { this.justDragged = false; return; }
     if (this.finished) return;
-    const stage = this.board[idx];
+    let stage = this.board[idx];
+    if (stage === CONFIG.CHAIN_LENGTH) stage = 0; // a finished tree acts like empty ground
     if (this.selected === -1) {
       if (stage > 0) { this.selected = idx; this.render(); }
       return;
@@ -308,13 +313,24 @@ class Puzzle {
     this.render();
     this.animateCell(to, 'pop-merge');
     if (next === CONFIG.CHAIN_LENGTH) {
-      this.finished = true;
-      this.winCellIdx = to; // the tree stays put; the run flies it later
+      // The tree stays on its cell (and play goes on around it) until the
+      // run flies it into the counter and clears the cell
       this.confettiBurst(to);
-      setTimeout(() => { this.teardown(); this.onWin(); }, 700);
+      setTimeout(() => { if (!this.finished) this.onWin(to); }, 700);
       return;
     }
     this.checkLoss();
+  }
+
+  // The flown-off tree leaves its cell; an empty plot gets a fresh species
+  // (a plot with leftovers keeps its species so they don't shape-shift)
+  clearCell(idx) {
+    this.board[idx] = 0;
+    this.inFlight.delete(idx);
+    if (this.board.every(v => v === 0)) {
+      this.species = CONFIG.SPECIES[Math.floor(Math.random() * CONFIG.SPECIES.length)];
+    }
+    this.render();
   }
 
   // Celebration confetti right on the cell where the tree formed
@@ -326,10 +342,11 @@ class Puzzle {
   }
 
   // The finished tree lifts off the plot and flies into the 🌳 counter
-  flyToCounter(idx = this.winCellIdx) {
+  flyToCounter(idx) {
     const cell = this.boardEl.querySelector(`[data-idx="${idx}"]`);
     const target = document.getElementById('school-trees');
     if (!cell || !target || !cell.animate || target.hidden) return;
+    this.inFlight.add(idx); // stays hidden until clearCell frees the cell
     const cr = cell.getBoundingClientRect();
     const tr = target.getBoundingClientRect();
     const fromX = cr.left + cr.width / 2;
@@ -422,6 +439,7 @@ class Puzzle {
       cell.className = 'cell' + (stage > 0 ? ' filled stage-' + stage : '');
       cell.dataset.idx = idx;
       if (idx === this.selected) cell.classList.add('selected');
+      if (this.inFlight.has(idx)) cell.classList.add('landing');
       if (stage > 0) {
         cell.innerHTML =
           this.spriteHTML(stage) +

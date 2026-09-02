@@ -107,8 +107,10 @@ The student's IB research became gameplay: an ℹ️ **"Why it matters"** page
 presents her outcomes (CO₂, biodiversity loss, extinction, soil erosion,
 droughts, global warming) and solutions (FSC products, plant a tree yearly,
 eat less beef, reuse paper, replant, support indigenous land rights). Every
-bulldozed patch teaches one consequence in its toast; every run's result
-screen sends players off with one real-world action.
+bulldozed patch teaches one consequence in its toast; while a run is on and
+nothing else is being said, the message band between the HUD and the board
+cycles through those consequences; every run's result screen sends players
+off with one real-world action.
 
 ### 11. Mobile-first polish for the exhibition
 The gameplay screens track the *visible* viewport (no scrolling, nothing

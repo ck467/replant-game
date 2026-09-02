@@ -37,33 +37,26 @@ class Challenge {
     });
   }
 
-  // targetPatch: when the run starts from tapping a patch, the first tree
-  // restores that exact patch; later trees green random barren ones.
+  // targetPatch: the tapped dead tree, restored when the run reaches its goal.
+  // One Puzzle lives for the whole run: finished trees sit on the plot while
+  // they celebrate, then fly off, and play never pauses in between.
   start(targetPatch = null) {
     this.targetPatch = targetPatch;
     this.running = true;
     this.treesDone = 0;
     this.goalTimeMs = null;
     this.deadline = null; // clock starts on the first crate open
+    this.celebrations = new Set();
     this.hud.hidden = false;
     this.renderHud(CONFIG.CHALLENGE.TIME_MS);
     this.showScreen('puzzle-screen');
     this.tick = setInterval(() => this.onTick(), 200);
-    this.nextTree();
-  }
-
-  // carry: {board, species} — leftover items from the previous tree stay on
-  // the board, and the species stays the same so they don't shape-shift.
-  nextTree(carry = null) {
-    const species = carry
-      ? carry.species
-      : CONFIG.SPECIES[Math.floor(Math.random() * CONFIG.SPECIES.length)];
-    // Coach once per account, on the run's first tree only
+    factTicker.start();
+    const species = CONFIG.SPECIES[Math.floor(Math.random() * CONFIG.SPECIES.length)];
     const acc = this.getAccount();
     this.puzzle = new Puzzle(species, {
       spawnBudget: Infinity,
-      board: carry ? carry.board : undefined,
-      tutor: this.treesDone === 0 && !acc.tutorDone,
+      tutor: !acc.tutorDone, // coach once per account
       onTutorComplete: () => {
         const a = this.getAccount();
         a.tutorDone = true;
@@ -72,49 +65,47 @@ class Challenge {
       onSpawn: () => {
         if (!this.deadline) this.deadline = Date.now() + CONFIG.CHALLENGE.TIME_MS;
       },
-      onWin: () => this.treeWon(),
+      onWin: idx => this.treeWon(idx),
       onLose: () => {} // unlimited spawns: only the clock can end the run
     });
   }
 
-  treeWon() {
+  // idx: the cell the new tree stands on. The crate stays open throughout;
+  // only that cell is spoken for until the tree flies into the counter.
+  treeWon(idx) {
     if (!this.running) return; // the clock ran out during the win celebration
-    const grown = this.puzzle; // keeps the finished board (and its tree) on screen
-    this.puzzle = null;
     this.treesDone++;
     // The map only changes when the run QUALIFIES: the final goal tree
     // restores the tapped patch. Quitting or falling short restores nothing.
     const reachedGoal = this.treesDone >= CONFIG.CHALLENGE.GOAL_TREES;
-    if (reachedGoal) {
+    if (this.treesDone === CONFIG.CHALLENGE.GOAL_TREES) {
       const acc = this.getAccount();
       if (this.targetPatch != null && this.isPatchBarren(this.targetPatch)) {
         this.socket.emit('restore', { idx: this.targetPatch, name: acc.name, avatar: acc.avatar });
       } else {
         this.socket.emit('challenge-tree', { name: acc.name, avatar: acc.avatar });
       }
-      // Today's leaderboard ranks by how fast you reached the goal
+      // The leaderboard remembers how fast you reached the goal
       this.goalTimeMs = CONFIG.CHALLENGE.TIME_MS - Math.max(0, this.deadline - Date.now());
       this.toast(`🏆 ${this.treesDone} trees — you restored a patch!`);
-    } else {
+    } else if (!reachedGoal) {
       this.toast(`🌳 Tree ${this.treesDone}/${CONFIG.CHALLENGE.GOAL_TREES} planted — keep going!`);
     }
     this.renderHud(this.deadline - Date.now());
     // The tree lingers on the plot while the toast shows; once the toast
-    // fades it flies into the counter, and then either the run ends (goal
-    // reached) or the next board arrives.
-    this.celebration = setTimeout(() => {
-      if (!this.running) return;
-      grown.flyToCounter();
-      this.celebration = setTimeout(() => {
-        if (!this.running) return;
-        if (reachedGoal) { this.endRun(); return; }
-        // Leftover items stay on the board for the next tree
-        const leftover = grown.board.slice();
-        leftover[grown.winCellIdx] = 0; // the tree itself flew away
-        const hasItems = leftover.some(v => v > 0);
-        this.nextTree(hasItems ? { board: leftover, species: grown.species } : null);
-      }, 700);
-    }, 2500);
+    // fades it flies into the counter and frees its cell — and if that was
+    // the goal tree, the run ends.
+    const later = (ms, fn) => {
+      const t = setTimeout(() => { this.celebrations.delete(t); if (this.running) fn(); }, ms);
+      this.celebrations.add(t);
+    };
+    later(2500, () => {
+      this.puzzle.flyToCounter(idx);
+      later(700, () => {
+        this.puzzle.clearCell(idx);
+        if (reachedGoal) this.endRun();
+      });
+    });
   }
 
   onTick() {
@@ -133,7 +124,9 @@ class Challenge {
   stopRun() {
     this.running = false;
     clearInterval(this.tick);
-    clearTimeout(this.celebration);
+    this.celebrations.forEach(t => clearTimeout(t));
+    this.celebrations.clear();
+    factTicker.stop();
     this.hud.hidden = true;
     if (this.puzzle) {
       this.puzzle.finished = true; // freeze the board
@@ -165,7 +158,7 @@ class Challenge {
         })
       });
       const data = await res.json();
-      rankLine = ` You're #${data.rank} of ${data.total} planters!`;
+      if (data.rank > 0) rankLine = ` You're #${data.rank} of ${data.total} restorers!`;
     } catch (e) { /* offline? show result without rank */ }
 
     const solution = CONFIG.SOLUTIONS[Math.floor(Math.random() * CONFIG.SOLUTIONS.length)];
@@ -179,9 +172,8 @@ class Challenge {
       celebrate: success,
       buttonText: '🗺️ Back to map',
       onButton: () => {
-        // Back on the map, show them where they landed in today's race
+        // Back on the map, show them where they landed on the board
         this.showScreen('map-screen');
-        setBoardTab('runs');
         document.getElementById('leaderboard').classList.add('open');
       }
     });

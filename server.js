@@ -67,12 +67,20 @@ function saveWorld() {
 saveWorld();
 
 // ---------- Players & leaderboard ----------
-// players: { name -> { name, avatar, trees, bestRun: {trees, timeMs} | null } }
+// players: { name -> { name, avatar, trees, patches, bestTimeMs | null } }
+// The board lists only players who have restored a patch, most patches first,
+// fastest goal time breaking ties.
 
 function loadPlayers() {
   try {
     const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
-    if (players && typeof players === 'object') return players;
+    if (players && typeof players === 'object') {
+      Object.values(players).forEach(p => { // older saves predate patch counts
+        p.patches = p.patches || 0;
+        if (p.bestTimeMs === undefined) p.bestTimeMs = null;
+      });
+      return players;
+    }
   } catch (e) { /* first boot */ }
   return {};
 }
@@ -84,35 +92,19 @@ function savePlayers() {
 }
 
 function getPlayer(name, avatar) {
-  if (!players[name]) players[name] = { name, avatar, trees: 0, bestRun: null };
+  if (!players[name]) players[name] = { name, avatar, trees: 0, patches: 0, bestTimeMs: null };
   players[name].avatar = avatar; // latest avatar wins (same-name rejoin)
   return players[name];
 }
 
 function rankedPlayers() {
-  return Object.values(players).sort((a, b) =>
-    b.trees - a.trees || a.name.localeCompare(b.name)
-  );
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-// A reaches the goal faster, or plants more trees if neither reached it
-function runBetter(a, b) {
-  if (!b) return true;
-  if (a.reached !== b.reached) return a.reached;
-  if (a.reached) return a.timeMs < b.timeMs;
-  return a.trees > b.trees;
-}
-
-// Today's run ranking: goal-reachers by speed, then the rest by tree count
-function rankedRunsToday() {
-  const day = today();
   return Object.values(players)
-    .filter(p => p.bestRun && p.bestRun.day === day)
-    .sort((a, b) => runBetter(a.bestRun, b.bestRun) ? -1 : 1);
+    .filter(p => p.patches > 0)
+    .sort((a, b) =>
+      b.patches - a.patches ||
+      (a.bestTimeMs ?? Infinity) - (b.bestTimeMs ?? Infinity) ||
+      a.name.localeCompare(b.name)
+    );
 }
 
 function broadcastLeaderboard() {
@@ -123,25 +115,23 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(rankedPlayers().slice(0, 50));
 });
 
-// A finished timed-challenge run: record the player's best FOR TODAY
+// A finished timed-challenge run: remember the player's fastest goal time
 app.post('/api/challenge/run', (req, res) => {
   const name = cleanName(req.body.name);
   if (!name) return res.status(400).json({ error: 'name required' });
   const avatar = cleanAvatar(req.body.avatar);
   const trees = Math.max(0, Math.min(99, parseInt(req.body.trees, 10) || 0));
   const timeMs = Math.max(0, Math.min(3600000, parseInt(req.body.timeMs, 10) || 0));
-  const run = { trees, timeMs, reached: req.body.reached === true, day: today() };
   const player = getPlayer(name, avatar);
-  player.trees += trees; // every tree grown counts toward the lifetime tab
-  const best = player.bestRun;
-  if (!best || best.day !== run.day || runBetter(run, best)) {
-    player.bestRun = run;
+  player.trees += trees;
+  if (req.body.reached === true && (player.bestTimeMs === null || timeMs < player.bestTimeMs)) {
+    player.bestTimeMs = timeMs;
   }
   savePlayers();
   broadcastLeaderboard();
-  const ranked = rankedRunsToday();
+  const ranked = rankedPlayers();
   res.json({
-    rank: ranked.findIndex(p => p.name === name) + 1,
+    rank: ranked.findIndex(p => p.name === name) + 1, // 0 = not on the board
     total: ranked.length
   });
 });
@@ -156,7 +146,7 @@ function restorePatch(idx, name, avatar) {
   const owner = { name, avatar };
   world.owners[idx] = owner;
   saveWorld();
-  getPlayer(name, avatar); // ensure they exist on the board
+  getPlayer(name, avatar).patches++;
   savePlayers();
   io.emit('patch', { idx, state: 'g', cause: 'restore', owner });
   broadcastLeaderboard();

@@ -163,24 +163,6 @@ body:has(#puzzle-screen.active) {
   color: var(--ink-wood);
 }
 .leaderboard .board-title { margin: 0 0 8px; text-align: center; color: var(--wood-mid); }
-.board-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
-.board-tab {
-  flex: 1;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: bold;
-  padding: 6px 4px;
-  background: rgba(255, 255, 255, 0.35);
-  color: var(--wood-mid);
-  border: 2px solid var(--wood-mid);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.board-tab.active {
-  background: var(--grass-dark);
-  color: #fff;
-  border-color: var(--wood-edge);
-}
 .board-rows {
   list-style: none;
   padding: 0;
@@ -915,9 +897,9 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .overlay-card p { line-height: 1.5; }
 
-/* One toast for everything: a wood sign as wide as the game board, sitting
-   at the board's bottom end during play (top set by JS); on the map it
-   floats near the lower third */
+/* One toast for everything: a wood sign as wide as the game board, centered
+   in the open band between the top UI and the board during play (top, width
+   set by JS); on the map it floats near the lower third */
 .toast {
   position: fixed;
   top: 68%;
@@ -943,3 +925,7 @@ body:has(#map-screen.active) { background: #3abe41; }
 /* During play the toast centers in the open band between top UI and board */
 .toast.over-board { transform: translate(-50%, -50%) scale(0.9); }
 .toast.over-board.show { transform: translate(-50%, -50%) scale(1); }
+/* A long message on a short band shrinks to stay clear of the board and HUD */
+.toast.compact { font-size: 0.82rem; padding: 7px 10px; line-height: 1.3; }
+/* Between real messages the band cycles through the deforestation facts */
+.toast.fact { font-weight: normal; font-style: italic; }
