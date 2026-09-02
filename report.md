@@ -81,15 +81,15 @@ bottom-sheet drawer on mobile — updates for everyone in real time.
 ### 8. The single game mode: a timed run with real stakes
 The game converged on one loop, refined across several prompts:
 - Tap a grey **dead tree** (the only interactable patches) to start a
-  **2-minute run** with unlimited crates — the clock is the pressure.
-- **Goal: 5 mature trees.** The clock always runs its full length; beating
-  the goal keeps counting.
-- **Qualification rule**: only reaching 5 trees restores the tapped patch.
+  **60-second run** with unlimited crates — the clock is the pressure.
+- **Goal: 4 mature trees.** Reaching the goal ends the run on the spot;
+  the clock only matters if you fall short.
+- **Qualification rule**: only reaching 4 trees restores the tapped patch.
   Quitting (with a confirmation warning) or falling short restores nothing.
 - Leftover board items carry over between trees; a completed tree flies into
   the HUD counter after lingering through its toast.
 - **Two leaderboard tabs** (the student's design): 🌳 All-time lifetime trees,
-  and ⏱️ Today's race — who reached 5 trees fastest, resetting daily for the
+  and ⏱️ Today's race — who reached 4 trees fastest, resetting daily for the
   exhibition.
 
 ### 9. Game feel ("juice")
@@ -141,7 +141,7 @@ regressions).
    then lands overnight; a restart wipes the leaderboard/world, so never
    deploy during the exhibition).
 2. Morning: sign in as **admin** on a staff device → ↺ resets the world fresh.
-3. Kids visit the URL, make an account, and race to 5 trees.
+3. Kids visit the URL, make an account, and race to 4 trees.
 4. Balance knobs if needed (`public/js/config.js` / `server.js`):
    `CHALLENGE.GOAL_TREES`, `CHALLENGE.TIME_MS`, `SPAWN_WEIGHTS`,
    `SPREAD_INTERVAL_MS` (currently 90s).
@@ -149,7 +149,7 @@ regressions).
 ## The message, by design
 
 The game's structure *is* the argument: bulldozers embody greed; the plague
-punishes neglect; restoration takes real effort (5 trees, earned); individual
+punishes neglect; restoration takes real effort (4 trees, earned); individual
 contribution is honored forever (All-time tab) even when the world loses
 ground; and the world itself can die from inaction — or be revived by a
 single player who plants again.

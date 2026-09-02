@@ -30,7 +30,7 @@ Everything lives in `public/js/config.js`:
 |---|---|---|
 | `BOARD_COLS/ROWS` | 3×3 | Puzzle board size |
 | `SPAWN_WEIGHTS` | 70/15/10/5 | Chance of stage 1/2/3/4 drops |
-| `CHALLENGE` | 3 trees / 120s | The timed run every session plays |
+| `CHALLENGE` | 4 trees / 60s | The timed run every session plays |
 | `MAP_COLS/ROWS` | 12×8 | World map patches |
 | `SPREAD_INTERVAL_MS` | 45000 | How often deforestation claims a green patch |
 | `RESTORE_GOAL_PCT` | 75 | Green % that counts as "balance restored" |
@@ -42,8 +42,9 @@ Everything lives in `public/js/config.js`:
   avatar (🎲 to reroll). No passwords; the identity lives in the browser's
   localStorage and on the leaderboard. A shared booth tablet uses the
   "🙋 New player" button between students.
-- **One mode: the timed run** — plant **3 full trees before the 2-minute
+- **One mode: the timed run** — plant **4 full trees before the 60-second
   timer** (unlimited crates; the clock starts on your first crate open).
+  Reaching the goal ends the run on the spot.
   Tap a barren patch to start a run whose FIRST tree restores that exact
   patch; the ⏱️ button starts a run that greens random patches. Every
   restored patch is stamped with your avatar (hover shows "Restored by ___")

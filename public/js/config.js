@@ -13,11 +13,11 @@ const CONFIG = {
   SPREAD_INTERVAL_MS: 45000, // deforestation claims one green patch this often
   RESTORE_GOAL_PCT: 75,      // green % that counts as "balance restored"
 
-  // Timed run: the goal is GOAL_TREES full trees, but the clock always runs
-  // its full TIME_MS — players who beat the goal keep planting past it.
+  // Timed run: grow GOAL_TREES full trees before TIME_MS runs out. Reaching
+  // the goal ends the run right away (after the last tree's celebration).
   CHALLENGE: {
-    GOAL_TREES: 5,
-    TIME_MS: 120000
+    GOAL_TREES: 4,
+    TIME_MS: 60000
   },
 
   // Anonymous accounts pick one of the crop-sheet portrait tiles as avatar

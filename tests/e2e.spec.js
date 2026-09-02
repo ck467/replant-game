@@ -33,7 +33,7 @@ async function winChallengeTree(page) {
   await cells.nth(1).click();
 }
 
-// Runs only end when the clock expires — shorten it so tests finish fast
+// Runs end on the goal or when the clock expires — shorten the clock so tests finish fast
 async function shortClock(page, ms) {
   await page.evaluate(t => { CONFIG.CHALLENGE.TIME_MS = t; }, ms);
 }
@@ -73,8 +73,8 @@ test('tapping a dead tree starts a timed run; living forest is scenery', async (
   await expect(page.locator('#puzzle-board')).toBeVisible();
   await expect(page.locator('#puzzle-goal')).toContainText('Grow Mature');
   await expect(page.locator('#school-hud')).toBeVisible();
-  await expect(page.locator('#school-timer')).toHaveText('2:00'); // clock waits for first crate
-  await expect(page.locator('#school-trees')).toHaveText('🌳 0/5');
+  await expect(page.locator('#school-timer')).toHaveText('1:00'); // clock waits for first crate
+  await expect(page.locator('#school-trees')).toHaveText('🌳 0/4');
   await expect(page.locator('#crate-count')).toBeHidden();        // no crate budget anywhere
 });
 
@@ -177,7 +177,7 @@ test('quitting or falling short restores nothing on the map', async ({ page }) =
   // Quit mid-run: a warning first ("keep playing" resumes), then no restoration
   await page.locator('.patch.barren').first().click();
   await winChallengeTree(page);
-  await expect(page.locator('#school-trees')).toHaveText('🌳 1/5', { timeout: 5000 });
+  await expect(page.locator('#school-trees')).toHaveText('🌳 1/4', { timeout: 5000 });
   await page.click('#puzzle-quit');
   await expect(page.locator('#overlay-title')).toContainText('Leave the run');
   await page.click('#overlay-btn'); // keep playing — still in the run
@@ -197,12 +197,12 @@ test('quitting or falling short restores nothing on the map', async ({ page }) =
   await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
 });
 
-test('beating the goal keeps going, and leftover items carry into the next board', async ({ page }) => {
+test('reaching the goal ends the run, and leftover items carry into the next board', async ({ page }) => {
   await freshGame(page, { forceStage: 4, name: 'Champ' });
   await enterMap(page);
   // Room for two trees, each followed by the ~3.2s toast-then-flight celebration
   await shortClock(page, 12000);
-  await page.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 1; });
+  await page.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 2; });
   await page.locator('.patch.barren').first().click();
   const goalBefore = await page.textContent('#puzzle-goal');
   // Tree 1 with a spare: three spawns, merge two, one stage-4 left over
@@ -212,8 +212,8 @@ test('beating the goal keeps going, and leftover items carry into the next board
   const cells = page.locator('#puzzle-board .cell.stage-4');
   await cells.nth(0).click();
   await cells.nth(1).click();
-  await expect(page.locator('#school-trees')).toHaveText('🌳 1/1', { timeout: 5000 });
-  // The run keeps going: no overlay yet
+  await expect(page.locator('#school-trees')).toHaveText('🌳 1/2', { timeout: 5000 });
+  // One short of the goal: the run keeps going, no overlay yet
   await expect(page.locator('#result-overlay.show')).toBeHidden();
   // After the celebration the tree is gone but the spare item survived,
   // and the species (goal text) stayed the same
@@ -225,10 +225,14 @@ test('beating the goal keeps going, and leftover items carry into the next board
   const pair = page.locator('#puzzle-board .cell.stage-4');
   await pair.nth(0).click();
   await pair.nth(1).click();
-  await expect(page.locator('#school-trees')).toHaveText('🌳 2/1', { timeout: 5000 });
-  await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 12000 });
+  await expect(page.locator('#school-trees')).toHaveText('🌳 2/2', { timeout: 5000 });
+  // Goal reached: the run ends right after the celebration, well before the clock
+  const clockBefore = await page.textContent('#school-timer');
+  await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 6000 });
+  expect(clockBefore).not.toBe('0:00');
   await expect(page.locator('#overlay-title')).toContainText('Patch restored, Champ');
   await expect(page.locator('#overlay-body')).toContainText('back to life');
+  await expect(page.locator('#overlay-body')).toContainText('Your 2 trees');
   // Today's race ranks the goal-reacher by time
   await page.click('#overlay-btn'); // back to map
   await page.click('#tab-runs');

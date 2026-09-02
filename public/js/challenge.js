@@ -1,4 +1,5 @@
-// Timed challenge: plant 3 full trees before the 2-minute clock runs out.
+// Timed challenge: plant GOAL_TREES full trees before the clock runs out.
+// Hitting the goal ends the run; the clock running out ends it too.
 // Runs under the player's account; every tree greens a random shared patch.
 
 function formatTime(ms) {
@@ -81,9 +82,10 @@ class Challenge {
     const grown = this.puzzle; // keeps the finished board (and its tree) on screen
     this.puzzle = null;
     this.treesDone++;
-    // The map only changes when the run QUALIFIES: the 5th tree restores
-    // the tapped patch. Quitting or falling short restores nothing.
-    if (this.treesDone === CONFIG.CHALLENGE.GOAL_TREES) {
+    // The map only changes when the run QUALIFIES: the final goal tree
+    // restores the tapped patch. Quitting or falling short restores nothing.
+    const reachedGoal = this.treesDone >= CONFIG.CHALLENGE.GOAL_TREES;
+    if (reachedGoal) {
       const acc = this.getAccount();
       if (this.targetPatch != null && this.isPatchBarren(this.targetPatch)) {
         this.socket.emit('restore', { idx: this.targetPatch, name: acc.name, avatar: acc.avatar });
@@ -92,18 +94,20 @@ class Challenge {
       }
       // Today's leaderboard ranks by how fast you reached the goal
       this.goalTimeMs = CONFIG.CHALLENGE.TIME_MS - Math.max(0, this.deadline - Date.now());
-      this.toast(`🏆 ${this.treesDone} trees — you restored a patch! Keep planting!`);
+      this.toast(`🏆 ${this.treesDone} trees — you restored a patch!`);
     } else {
       this.toast(`🌳 Tree ${this.treesDone}/${CONFIG.CHALLENGE.GOAL_TREES} planted — keep going!`);
     }
     this.renderHud(this.deadline - Date.now());
     // The tree lingers on the plot while the toast shows; once the toast
-    // fades it flies into the counter, and then the next board arrives.
+    // fades it flies into the counter, and then either the run ends (goal
+    // reached) or the next board arrives.
     this.celebration = setTimeout(() => {
       if (!this.running) return;
       grown.flyToCounter();
       this.celebration = setTimeout(() => {
         if (!this.running) return;
+        if (reachedGoal) { this.endRun(); return; }
         // Leftover items stay on the board for the next tree
         const leftover = grown.board.slice();
         leftover[grown.winCellIdx] = 0; // the tree itself flew away

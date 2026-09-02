@@ -149,7 +149,7 @@ function renderLeaderboard(players) {
     statsFor = p => p.bestRun.reached
       ? `⏱️ ${formatRunTime(p.bestRun.timeMs)}`
       : `🌳 ${Math.min(p.bestRun.trees, CONFIG.CHALLENGE.GOAL_TREES)}/${CONFIG.CHALLENGE.GOAL_TREES}`;
-    empty.textContent = 'No runs today — race to 5 trees!';
+    empty.textContent = `No runs today — race to ${CONFIG.CHALLENGE.GOAL_TREES} trees!`;
   }
 
   empty.hidden = list.length > 0;
