@@ -59,15 +59,16 @@ Everything lives in `public/js/config.js`:
   Reaching the goal ends the run on the spot.
   Tap a barren patch to start a run whose FIRST tree restores that exact
   patch; the ⏱️ button starts a run that greens random patches. Every
-  restored patch is stamped with your avatar (hover shows "Restored by ___")
-  and adds to your leaderboard total. Tune in `CONFIG.CHALLENGE`.
+  restored patch gets a signpost with your name and adds to your
+  leaderboard total. Tune in `CONFIG.CHALLENGE`.
 - **🏆 Top Planters leaderboard** — only players who have restored a
   patch appear, ranked by patches restored, ties broken by fastest goal
-  time; each name is painted on a little wooden signpost. The whole board
-  is listed, 30 per page, and every time it is shown it opens on the
-  player's own page with their row highlighted and centered. Always on
-  screen on desktop; a drawer (🏆 button) on small screens. Live-updates
-  for everyone over Socket.IO.
+  time. The whole board is listed, 30 per page, and every time it is shown
+  it opens on the player's own page with their row highlighted and
+  centered. Always on screen on desktop; a drawer (🏆 button) on small
+  screens. Live-updates for everyone over Socket.IO.
+- **Signposts** — every restored patch on the map carries a little wooden
+  signpost painted with the planter's name (hover shows "Restored by ___").
 - **Admin resets** — signing in as `admin` shows two buttons: ↺ resets the
   world map (leaderboard kept) and 🗑️ clears the leaderboard (map kept).
   Each asks for the admin key, which the server checks against its

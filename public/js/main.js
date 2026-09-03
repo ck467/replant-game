@@ -207,19 +207,19 @@ function renderLeaderboard(players) {
     const li = document.createElement('li');
     li.className = 'board-row' + (account && p.name === account.name ? ' me' : '');
 
-    const sign = document.createElement('span');
-    sign.className = 'board-sign';
+    const avatar = document.createElement('span');
+    avatar.className = 'avatar-sprite';
+    paintAvatar(avatar, p.avatar);
+
     const name = document.createElement('span');
-    name.className = 'board-sign-name';
+    name.className = 'board-name';
     name.textContent = p.name;
-    name.title = p.name;
-    sign.appendChild(name);
 
     const stats = document.createElement('span');
     stats.className = 'board-stats';
     stats.textContent = statsFor(p);
 
-    li.append(sign, stats);
+    li.append(avatar, name, stats);
     return li;
   }));
   centerMyRow();

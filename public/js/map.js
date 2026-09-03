@@ -285,12 +285,16 @@ class WorldMap {
       // Randomize the wind sway so the forest doesn't move in lockstep
       patch.style.setProperty('--sway-dur', (2.6 + (h % 17) / 10) + 's');
       patch.style.setProperty('--sway-delay', '-' + (h % 31) / 10 + 's');
+      // A restored patch gets a little wooden signpost with the planter's name
       const owner = this.owners[idx];
       if (owner) {
-        const badge = document.createElement('span');
-        badge.className = 'avatar-sprite patch-owner';
-        paintAvatar(badge, owner.avatar);
-        patch.appendChild(badge);
+        const sign = document.createElement('span');
+        sign.className = 'patch-sign';
+        const name = document.createElement('span');
+        name.className = 'patch-sign-name';
+        name.textContent = owner.name;
+        sign.appendChild(name);
+        patch.appendChild(sign);
         patch.title = `Restored by ${owner.name}`;
       }
     }

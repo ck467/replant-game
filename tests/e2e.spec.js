@@ -197,10 +197,11 @@ test('a qualifying run restores the tapped patch with your avatar', async ({ pag
   await expect(page.locator('.overlay-card.celebrate')).toBeVisible();
   await expect(page.locator('#overlay-btn2')).toBeHidden();
   await page.click('#overlay-btn'); // back to map
-  // The tapped dead tree is now alive and wears the planter's portrait
+  // The tapped dead tree is now alive and carries a signpost with the planter's name
   const tapped = page.locator(`.patch[data-map-idx="${target}"]`);
   await expect(tapped).toHaveClass(/green/);
   await expect(tapped).toHaveAttribute('title', /Restored by Planter/);
+  await expect(tapped.locator('.patch-sign .patch-sign-name')).toHaveText('Planter');
   // Returning from a run opens the leaderboard: one patch, with the goal time
   await expect(page.locator('#leaderboard')).toHaveClass(/open/);
   await expect(page.locator('#board-rows .board-row').first()).toContainText('Planter');
@@ -451,9 +452,7 @@ test('the full board is paged by 30 and opens on the player, centered', async ({
   await expect(page.locator('#board-page-label')).toHaveText('2 / 2');
   await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
   await expect(page.locator('#board-rows .board-row.me')).toContainText('Tester');
-  // The name is painted on a wooden signpost, not next to an avatar
-  await expect(page.locator('#board-rows .board-row.me .board-sign .board-sign-name')).toHaveText('Tester');
-  await expect(page.locator('#board-rows .avatar-sprite')).toHaveCount(0);
+  await expect(page.locator('#board-rows .board-row.me .avatar-sprite')).toHaveCount(1);
   const inView = await page.evaluate(() => {
     const me = document.querySelector('.board-row.me').getBoundingClientRect();
     const box = document.getElementById('board-rows').getBoundingClientRect();

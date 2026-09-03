@@ -74,8 +74,8 @@ concept, embodied on the map.
 ### 7. One identity system: anon accounts, avatars, and a shared leaderboard
 The early school/online mode split was unified: every player creates an
 anonymous account (name + random crop-portrait avatar with a 🎲 reroll) that
-persists on their device. Restored patches are stamped with the planter's
-avatar ("Restored by ___"), and a live leaderboard — pinned on desktop, a
+persists on their device. Restored patches carry a wooden signpost with the
+planter's name ("Restored by ___"), and a live leaderboard — pinned on desktop, a
 bottom-sheet drawer on mobile — updates for everyone in real time.
 
 ### 8. The single game mode: a timed run with real stakes
@@ -90,8 +90,9 @@ The game converged on one loop, refined across several prompts:
   the HUD counter after lingering through its toast — and the crate stays
   open the whole time, so play never pauses for a celebration.
 - **One leaderboard: 🏆 Top Planters** — only players who have restored a
-  patch are listed, most patches first, fastest goal time breaking ties,
-  each name painted on a little wooden signpost.
+  patch are listed, most patches first, fastest goal time breaking ties.
+- **Signposts on the map** (the student's design): every restored patch
+  carries a little wooden signpost painted with the planter's name.
 
 ### 9. Game feel ("juice")
 Layered feedback for every action: items pop out of the crate and arc onto
