@@ -402,6 +402,27 @@ test('at 0% green the whole world goes dark, and replanting revives it', async (
   await expect(page.locator('.scene-cell.grove').first()).toBeVisible();
 });
 
+test('the plague spares freshly restored patches and halts at the green floor', async ({ page }) => {
+  await freshGame(page);
+  await enterMap(page);
+  await page.request.post('/debug/kill');
+  await expect(page.locator('#green-pct')).toHaveText('0%');
+  // 20 fresh restores (21% green), every one inside its grace period
+  await page.evaluate(() => {
+    for (let i = 0; i < 20; i++) window.__socket.emit('restore', { idx: i, name: 'Kid', avatar: 1 });
+  });
+  await expect(page.locator('.patch.green')).toHaveCount(20);
+  for (let i = 0; i < 3; i++) await page.request.post('/debug/spread');
+  await page.waitForTimeout(2500); // longer than a bulldozer's drive-in
+  await expect(page.locator('.patch.green')).toHaveCount(20); // nothing was bulldozed
+  // Once the grace has passed the plague bites again — but only down to the
+  // floor: 15% of 96 patches means it stops at 14 green
+  for (let i = 0; i < 10; i++) await page.request.post('/debug/spread?ignoreGrace=1');
+  await expect(page.locator('.patch.green')).toHaveCount(14, { timeout: 15000 });
+  await page.waitForTimeout(2000);
+  await expect(page.locator('.patch.green')).toHaveCount(14);
+});
+
 test('world state survives a page reload (lives on the server)', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);

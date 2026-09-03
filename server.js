@@ -15,6 +15,13 @@ const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const MAP_COLS = 12;
 const MAP_ROWS = 8;
 const SPREAD_INTERVAL_MS = 90000; // rebalanced: a run now restores ONE patch
+// A freshly restored patch is safe from the plague for this long, so a
+// planter always gets to see their tree standing with their sign on it
+const RESTORE_GRACE_MS = parseInt(process.env.RESTORE_GRACE_MS, 10) || 10 * 60 * 1000;
+// …and the plague halts once the world is this green or less, so it can
+// never be eaten to nothing while the booth is busy
+const PLAGUE_FLOOR_PCT = process.env.PLAGUE_FLOOR_PCT !== undefined
+  ? parseFloat(process.env.PLAGUE_FLOOR_PCT) : 15;
 const AVATAR_COUNT = 20;
 
 const app = express();
@@ -120,14 +127,24 @@ function generateGrid() {
   return grid;
 }
 
+// world: { grid: ['g'|'b'...], owners: {idx -> {name, avatar}},
+//          protected: {idx -> ms timestamp the plague may touch it again} }
+function freshWorld() {
+  return { grid: generateGrid(), owners: {}, protected: {} };
+}
+
 function validWorld(data) {
   if (Array.isArray(data) && data.length === MAP_COLS * MAP_ROWS) {
-    return { grid: data, owners: {} }; // legacy format
+    return { grid: data, owners: {}, protected: {} }; // legacy format
   }
   if (data && Array.isArray(data.grid) && data.grid.length === MAP_COLS * MAP_ROWS) {
-    return { grid: data.grid, owners: data.owners || {} };
+    return { grid: data.grid, owners: data.owners || {}, protected: data.protected || {} };
   }
   return null; // first boot or corrupt — regenerate
+}
+
+function greenPct() {
+  return world.grid.filter(v => v === 'g').length / world.grid.length * 100;
 }
 
 let world = null; // set in boot()
@@ -211,6 +228,7 @@ function restorePatch(idx, name, avatar) {
   world.grid[idx] = 'g';
   const owner = { name, avatar };
   world.owners[idx] = owner;
+  world.protected[idx] = Date.now() + RESTORE_GRACE_MS;
   saveWorld();
   getPlayer(name, avatar).patches++;
   savePlayers();
@@ -231,15 +249,26 @@ function neighbors(idx) {
 }
 
 // One tick of the plague: a random green patch on the frontier turns barren.
-function spread() {
+// Patches inside their restore grace period are never picked, and nothing
+// happens at all once the world is at or below the green floor.
+// ignoreGrace is a test-only switch so the floor can be exercised alone.
+function spread({ ignoreGrace = false } = {}) {
+  if (greenPct() <= PLAGUE_FLOOR_PCT) return;
+  const now = Date.now();
+  Object.keys(world.protected).forEach(k => { // forget expired protections
+    if (world.protected[k] <= now || world.grid[k] !== 'g') delete world.protected[k];
+  });
   const frontier = [];
   world.grid.forEach((v, i) => {
-    if (v === 'g' && neighbors(i).some(n => world.grid[n] === 'b')) frontier.push(i);
+    if (v !== 'g') return;
+    if (!ignoreGrace && world.protected[i]) return;
+    if (neighbors(i).some(n => world.grid[n] === 'b')) frontier.push(i);
   });
   if (frontier.length === 0) return;
   const victim = frontier[Math.floor(Math.random() * frontier.length)];
   world.grid[victim] = 'b';
   delete world.owners[victim];
+  delete world.protected[victim];
   saveWorld();
   io.emit('patch', { idx: victim, state: 'b', cause: 'spread' });
 }
@@ -254,15 +283,18 @@ if (!process.env.SPREAD_DISABLED) {
 
 // Test-only hooks so e2e tests can control the world deterministically.
 if (process.env.TEST_MODE) {
-  app.post('/debug/spread', (req, res) => { spread(); res.sendStatus(204); });
+  app.post('/debug/spread', (req, res) => {
+    spread({ ignoreGrace: req.query.ignoreGrace === '1' });
+    res.sendStatus(204);
+  });
   app.post('/debug/kill', (req, res) => {
-    world = { grid: world.grid.map(() => 'b'), owners: {} };
+    world = { grid: world.grid.map(() => 'b'), owners: {}, protected: {} };
     saveWorld();
     io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
     res.sendStatus(204);
   });
   app.post('/debug/reset', (req, res) => {
-    world = { grid: generateGrid(), owners: {} };
+    world = freshWorld();
     saveWorld();
     players = {};
     savePlayers();
@@ -313,7 +345,7 @@ io.on('connection', (socket) => {
   socket.on('reset-world', (payload, ack) => {
     const done = authorizeAdmin(payload, ack);
     if (!done) return;
-    world = { grid: generateGrid(), owners: {} };
+    world = freshWorld();
     saveWorld();
     io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
     done({ ok: true });
@@ -337,7 +369,7 @@ async function boot() {
   if (!ADMIN_KEY) console.warn('ADMIN_KEY not set — the admin reset buttons will be refused');
   await initStorage();
   world = validWorld(await loadState('world', STATE_FILE, path.join(SEED_DIR, 'map-state.json')))
-    || { grid: generateGrid(), owners: {} };
+    || freshWorld();
   saveWorld();
   players = validPlayers(await loadState('players', PLAYERS_FILE, path.join(SEED_DIR, 'players.json')));
   savePlayers();

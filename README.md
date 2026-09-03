@@ -48,6 +48,12 @@ Everything lives in `public/js/config.js`:
 | `RESTORE_GOAL_PCT` | 75 | Green % that counts as "balance restored" |
 | `SPECIES` | Lemon, Coffee, Orange, Avocado | Names, sprite tiles, and win-screen facts |
 
+The plague itself is tuned in `server.js` (or by environment variable):
+`SPREAD_INTERVAL_MS` (90s between bulldozings, only while someone is
+connected), `RESTORE_GRACE_MS` (a freshly restored patch is safe for 10
+minutes), and `PLAGUE_FLOOR_PCT` (the plague halts at 15% green or less, so
+the world can never be eaten to nothing).
+
 ## How it plays
 
 - **Anon accounts** — every player types a name and gets a random crop-portrait

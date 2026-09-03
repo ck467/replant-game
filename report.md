@@ -139,11 +139,19 @@ name is no longer enough to wipe anything. The board itself lists everyone who h
 and opens on the player's own row, highlighted and centered, every time it is
 shown.
 
+### 14. "The patch I restored isn't there" — balancing a world that no longer resets
+With the map persisting, an hour of play let the plague eat every last patch,
+and a freshly restored tree on a nearly dead map was the bulldozer's next
+target within 90 seconds — so restores looked like they never happened. Two
+rules fixed it: a restored patch is safe from the plague for ten minutes (the
+planter always sees their tree standing, sign and all), and the plague halts
+once the world is 15% green or less, so it can never be eaten to nothing.
+
 ---
 
 ## Quality practice
 
-Every feature landed with Playwright end-to-end coverage — **20 tests** at the
+Every feature landed with Playwright end-to-end coverage — **21 tests** at the
 time of writing, spanning account creation, the tutorial, merging (tap and
 drag), the qualification rule, quit warnings, the message band, leaderboard
 paging and drawer behavior, the admin resets, bulldozer destruction, the
@@ -162,7 +170,8 @@ regressions).
 3. Kids visit the URL, make an account, and race to 4 trees.
 4. Balance knobs if needed (`public/js/config.js` / `server.js`):
    `CHALLENGE.GOAL_TREES`, `CHALLENGE.TIME_MS`, `SPAWN_WEIGHTS`,
-   `SPREAD_INTERVAL_MS` (currently 90s).
+   `SPREAD_INTERVAL_MS` (90s), `RESTORE_GRACE_MS` (a new tree is safe from
+   the plague for 10 min), `PLAGUE_FLOOR_PCT` (the plague halts at 15% green).
 
 ## The message, by design
 
