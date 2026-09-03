@@ -4,3 +4,7 @@ playwright-report/
 .playwright-mcp/
 map-state.json
 players.json
+
+# The carry-over snapshot the database is seeded from must ship
+!seed/players.json
+!seed/map-state.json
