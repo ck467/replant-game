@@ -8,8 +8,8 @@ const CONFIG = {
   CHAIN_LENGTH: 5,
 
   // World map
-  MAP_COLS: 12,
-  MAP_ROWS: 8,
+  MAP_COLS: 31, // the whole land of the 32x18 scene (a river takes the last column)
+  MAP_ROWS: 16, // …and the bottom two rows (river channel + fence)
   SPREAD_INTERVAL_MS: 45000, // deforestation claims one green patch this often
   RESTORE_GOAL_PCT: 75,      // green % that counts as "balance restored"
 

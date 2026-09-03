@@ -12,8 +12,8 @@ const SEED_DIR = path.join(__dirname, 'seed');
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 // Authoritative world settings (client gets these with the map payload)
-const MAP_COLS = 12;
-const MAP_ROWS = 8;
+const MAP_COLS = 31; // every land tile of the client's 32x18 scene is a patch
+const MAP_ROWS = 16;
 const SPREAD_INTERVAL_MS = 90000; // rebalanced: a run now restores ONE patch
 // A freshly restored patch is safe from the plague for this long, so a
 // planter always gets to see their tree standing with their sign on it

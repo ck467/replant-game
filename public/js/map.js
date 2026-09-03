@@ -1,37 +1,24 @@
 // World map: a socket-driven view of the shared world.
 // The server owns the grid; this class renders it and forwards actions.
 //
-// The screen is a 20x11 decorative tile scene (grass, river, fence, decor)
-// with the playable 12x8 patch grid embedded at PLAY_COL/PLAY_ROW.
-
-// The world is a fixed, expansive scene — bigger than most viewports —
-// that the player pans around. Tiles are a fixed 64px (4x pixel scale).
+// The screen is a fixed, expansive 32x18 tile scene — bigger than most
+// viewports — that the player pans around, at 64px per tile (4x pixel
+// scale). Every land tile is a playable patch (the 31x16 grid, starting at
+// the top-left corner); a river runs down the right edge into a full-width
+// channel along the bottom, and a fence closes the last row. There is no
+// painted-on forest: if it looks like a tree, it can be tapped.
 const SCENE = {
   COLS: 32,
   ROWS: 18,
   TILE: 64,
-  PLAY_COL: 10,  // 12x8 play grid at cols 10-21, rows 4-11
-  PLAY_ROW: 4,
-  RIVER_COL: 26, // straight channel down into the bottom river
+  PLAY_COL: 0,
+  PLAY_ROW: 0,
+  RIVER_COL: 31, // straight channel down into the bottom river
   RIVER_ROW: 16,
   FENCE_ROW: 17,
   HB: 'assets/blind_hummingbird_spritesheet_16x16.png',    // 8x4 sheet
   DECOR: 'assets/forest_decoration_set_16x16.png'          // 8x4 sheet
 };
-
-// Hand-placed critters and set pieces [sheet, col, row]
-// (the hummingbird is alive now — it flies by, spawned by ambient.js)
-const SET_PIECES = {
-  '15,1': [SCENE.HB, 2, 0],    // pink flower pair
-  '6,14': [SCENE.DECOR, 0, 2], // crystal
-  '24,2': [SCENE.DECOR, 2, 0], // fallen log
-  '3,3': [SCENE.DECOR, 0, 2],  // crystal in the far meadow
-  '29,12': [SCENE.DECOR, 1, 0] // rock beyond the river
-};
-
-// Hash-scattered decor: lush picks for the left/top, dead picks for the right
-const LUSH_DECOR = [[3, 1], [4, 1], [7, 0], [2, 1], [4, 3], [5, 3], [1, 1]];
-const DEAD_DECOR = [[1, 0], [2, 0], [6, 0], [3, 0]];
 
 class WorldMap {
   constructor(socket, { onPatchClick, onSpread, onChange }) {
@@ -83,10 +70,10 @@ class WorldMap {
   }
 
   initDozers() {
-    // Two dozers idle in the deforested zone
+    // Two dozers idle in the deforested (right) half
     this.dozers = [
-      { x: (SCENE.PLAY_COL + 8) * SCENE.TILE, y: (SCENE.PLAY_ROW + 1) * SCENE.TILE, flip: false, el: null },
-      { x: (SCENE.PLAY_COL + 10) * SCENE.TILE, y: (SCENE.PLAY_ROW + 6) * SCENE.TILE, flip: true, el: null }
+      { x: 22 * SCENE.TILE, y: 3 * SCENE.TILE, flip: false, el: null },
+      { x: 26 * SCENE.TILE, y: 10 * SCENE.TILE, flip: true, el: null }
     ];
     // A few beetles wander the meadow (4-frame walk cycle from the HB sheet)
     this.critters = [
@@ -225,42 +212,18 @@ class WorldMap {
       `${(col / 7 * 100).toFixed(4)}% ${(row / 3 * 100).toFixed(4)}%, 0 0`;
   }
 
+  // The only scenery left: the river and the fence
   buildSceneCell(c, r) {
     const cell = document.createElement('div');
     cell.className = 'scene-cell';
-    const key = `${c},${r}`;
     const isRiver = c === SCENE.RIVER_COL && r < SCENE.RIVER_ROW || r === SCENE.RIVER_ROW;
     if (isRiver) {
       cell.classList.add(r === SCENE.RIVER_ROW ? 'water-h' : 'water-v');
     } else if (r === SCENE.FENCE_ROW) {
       WorldMap.sprite(cell, SCENE.DECOR, 6, 2); // fence line along the bottom
-    } else if (SET_PIECES[key]) {
-      const [sheet, col, row] = SET_PIECES[key];
-      WorldMap.sprite(cell, sheet, col, row);
     } else {
-      const dead = c >= SCENE.PLAY_COL + this.cols; // right of the grid feels the blight
-      // Clumped wild forest: a coarse block hash makes bushes grow in
-      // 2x2-ish groves rather than uniform noise (burnt ones on the dead side)
-      // When the whole world is deforested, the wild forest dies too
-      const dying = dead || this.worldDead;
-      const grove = (((c >> 1) * 97 + (r >> 1) * 193 + 11) * 2654435761 >>> 0) % 100;
-      const inGrove = ((c * 41 + r * 61 + 5) * 2654435761 >>> 0) % 100;
-      const h = ((c * 73 + r * 151 + 7) * 2654435761 >>> 0) % 100;
-      if (grove < (dead ? 20 : 35) && inGrove < 78) {
-        WorldMap.sprite(cell, SCENE.HB, 5, dying ? 2 : 1); // bush / burnt bush
-        if (!dying) {
-          cell.classList.add('grove'); // living bushes sway like the play grid's
-          cell.style.setProperty('--sway-dur', (2.6 + (inGrove % 17) / 10) + 's');
-          cell.style.setProperty('--sway-delay', '-' + (inGrove % 31) / 10 + 's');
-        }
-      } else if (h < 26) {
-        const list = dying ? DEAD_DECOR : LUSH_DECOR;
-        const [col, row] = list[h % list.length];
-        WorldMap.sprite(cell, SCENE.DECOR, col, row);
-      } else {
-        cell.style.background = "url('assets/grass_16.png')";
-        cell.style.backgroundSize = '100% 100%';
-      }
+      cell.style.background = "url('assets/grass_16.png')";
+      cell.style.backgroundSize = '100% 100%';
     }
     return cell;
   }

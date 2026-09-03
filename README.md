@@ -43,7 +43,7 @@ Everything lives in `public/js/config.js`:
 | `BOARD_COLS/ROWS` | 3×3 | Puzzle board size |
 | `SPAWN_WEIGHTS` | 70/15/10/5 | Chance of stage 1/2/3/4 drops |
 | `CHALLENGE` | 4 trees / 60s | The timed run every session plays |
-| `MAP_COLS/ROWS` | 12×8 | World map patches |
+| `MAP_COLS/ROWS` | 31×16 | World map patches (every land tile of the scene; mirror in `server.js`) |
 | `SPREAD_INTERVAL_MS` | 45000 | How often deforestation claims a green patch |
 | `RESTORE_GOAL_PCT` | 75 | Green % that counts as "balance restored" |
 | `SPECIES` | Lemon, Coffee, Orange, Avocado | Names, sprite tiles, and win-screen facts |

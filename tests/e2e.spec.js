@@ -16,7 +16,26 @@ async function freshGame(page, opts = {}) {
     if (o.forceStage) window.__TEST_FORCE_SPAWN_STAGE = o.forceStage;
   }, opts);
   await page.goto('/');
-  await expect(page.locator('.patch')).toHaveCount(96); // map arrived over the socket
+  await expect(page.locator('.patch')).toHaveCount(PATCHES); // map arrived over the socket
+}
+
+// Every land tile of the 32x18 scene is a patch: 31 columns x 16 rows
+const PATCHES = 31 * 16;
+
+// The scene is bigger than the viewport and pans by transform, so Playwright
+// can't scroll a patch into view: tap a dead tree that is already on screen
+// (clear of the HUD along the top). Returns its map index.
+async function tapDeadTree(page) {
+  const idx = await page.evaluate(() => {
+    const onScreen = [...document.querySelectorAll('.patch.barren')].find(p => {
+      const r = p.getBoundingClientRect();
+      return r.top >= 150 && r.left >= 0 && r.bottom <= window.innerHeight - 10 && r.right <= window.innerWidth;
+    });
+    return onScreen ? onScreen.dataset.mapIdx : null;
+  });
+  if (idx === null) throw new Error('no dead tree on screen');
+  await page.click(`.patch[data-map-idx="${idx}"]`);
+  return idx;
 }
 
 async function enterMap(page) {
@@ -63,15 +82,16 @@ test('tapping a dead tree starts a timed run; living forest is scenery', async (
   await freshGame(page);
   await enterMap(page);
   const green = await page.locator('.patch.green').count();
-  expect(green).toBeGreaterThan(25);
-  expect(green).toBeLessThan(71);
-  // Living trees and wild groves do nothing
-  await page.locator('.patch.green').first().click({ force: true });
+  expect(green).toBeGreaterThan(PATCHES * 0.35); // roughly half the world
+  expect(green).toBeLessThan(PATCHES * 0.65);
+  // Living trees do nothing (they're disabled buttons: dispatch a click directly)
+  await page.evaluate(() => document.querySelector('.patch.green').click());
   await expect(page.locator('#world-map')).toBeVisible();
-  await page.evaluate(() => { const g = document.querySelector('.scene-cell.grove'); if (g) g.click(); });
-  await expect(page.locator('#world-map')).toBeVisible();
+  // There is no painted-on forest any more: every non-river, non-fence tile is a patch
+  const scenery = await page.locator('.scene-cell').count();
+  expect(scenery).toBe(32 * 18 - PATCHES);
   // A grey dead tree starts the run
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await expect(page.locator('#puzzle-board')).toBeVisible();
   await expect(page.locator('#puzzle-goal')).toContainText('Grow Mature');
   await expect(page.locator('#school-hud')).toBeVisible();
@@ -83,7 +103,7 @@ test('tapping a dead tree starts a timed run; living forest is scenery', async (
 test('staged tutorial guides crate → merge → goal, and the recipe book opens', async ({ page }) => {
   await freshGame(page, { forceStage: 1 });
   await enterMap(page);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   // Step 1 arrives as a toast: open the crate
   await expect(page.locator('#toast')).toBeVisible();
   await expect(page.locator('#toast')).toContainText('Open Crate');
@@ -110,7 +130,7 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
   expect(acc.tutorDone).toBe(true);
   await page.click('#puzzle-quit');
   await page.click('#overlay-btn2'); // confirm quitting the live run
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await expect(page.locator('#puzzle-board')).toBeVisible();
   await page.waitForTimeout(600);
   await expect(page.locator('#toast')).not.toContainText('Open Crate'); // no repeat coaching
@@ -119,7 +139,7 @@ test('staged tutorial guides crate → merge → goal, and the recipe book opens
 test('rare crate drops show Lucky floating text', async ({ page }) => {
   await freshGame(page, { forceStage: 3 });
   await enterMap(page);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await page.click('#crate-btn');
   await expect(page.locator('.lucky-vfx')).toHaveText('Lucky!');
   await page.evaluate(() => { window.__TEST_FORCE_SPAWN_STAGE = 4; });
@@ -138,7 +158,7 @@ test('the admin account gets two confirmed resets: world and leaderboard', async
     localStorage.setItem('replant_account_v1', JSON.stringify({ name: 'Admin', avatar: 0 }));
   });
   await page.reload();
-  await expect(page.locator('.patch')).toHaveCount(96);
+  await expect(page.locator('.patch')).toHaveCount(PATCHES);
   await enterMap(page);
   await expect(page.locator('#reset-btn')).toBeVisible();
   await expect(page.locator('#reset-board-btn')).toBeVisible();
@@ -185,8 +205,7 @@ test('a qualifying run restores the tapped patch with your avatar', async ({ pag
   await freshGame(page, { forceStage: 4, name: 'Planter' });
   await enterMap(page);
   await shortClock(page, 3500);
-  const target = await page.locator('.patch.barren').first().getAttribute('data-map-idx');
-  await page.locator('.patch.barren').first().click();
+  const target = await tapDeadTree(page);
   await page.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 1; }); // qualify with one tree
   await winChallengeTree(page);
   await expect(page.locator('.confetti span').first()).toBeAttached(); // burst at the winning cell
@@ -214,7 +233,7 @@ test('quitting or falling short restores nothing on the map', async ({ page }) =
   await enterMap(page);
   const greenBefore = await page.locator('.patch.green').count();
   // Quit mid-run: a warning first ("keep playing" resumes), then no restoration
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await winChallengeTree(page);
   await expect(page.locator('#school-trees')).toHaveText('🌳 1/4', { timeout: 5000 });
   await page.click('#puzzle-quit');
@@ -227,7 +246,7 @@ test('quitting or falling short restores nothing on the map', async ({ page }) =
   await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
   // Timing out below the goal: progress shown, still no restoration
   await shortClock(page, 3000);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await winChallengeTree(page);
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#overlay-body')).toContainText('Planted: 1');
@@ -245,7 +264,7 @@ test('reaching the goal ends the run, and leftover items carry into the next boa
   // Room for two trees, each followed by the ~3.2s toast-then-flight celebration
   await shortClock(page, 12000);
   await page.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 2; });
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   const goalBefore = await page.textContent('#puzzle-goal');
   // Tree 1 with a spare: three spawns, merge two, one stage-4 left over
   await page.click('#crate-btn');
@@ -284,7 +303,7 @@ test('reaching the goal ends the run, and leftover items carry into the next boa
 test('the crate stays open while a finished tree waits to fly off', async ({ page }) => {
   await freshGame(page, { forceStage: 4, name: 'Busy' });
   await enterMap(page);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await winChallengeTree(page);
   await expect(page.locator('#puzzle-board .cell.stage-5')).toHaveCount(1);
   // While the tree celebrates on its cell, the crate still works…
@@ -306,7 +325,7 @@ test('the crate stays open while a finished tree waits to fly off', async ({ pag
 test('during a run the band cycles deforestation facts between messages', async ({ page }) => {
   await freshGame(page, { tutorDone: true }); // no coaching toasts in the way
   await enterMap(page);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   // No tutorial, no progress yet: the band shows a research fact
   await expect(page.locator('#toast')).toContainText('When forests are cut down', { timeout: 4000 });
   await expect(page.locator('#toast')).toHaveClass(/fact/);
@@ -334,7 +353,7 @@ test('during a run the band cycles deforestation facts between messages', async 
 test('dragging an item onto its match merges them', async ({ page }) => {
   await freshGame(page, { forceStage: 1 });
   await enterMap(page);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await page.click('#crate-btn');
   await page.click('#crate-btn');
   const seeds = page.locator('#puzzle-board .cell.stage-1');
@@ -378,7 +397,7 @@ test('the Why-it-matters page shows the research, and run results teach a soluti
   await expect(page.locator('#info-overlay.show')).toBeHidden();
   // Run results carry a real-world action
   await shortClock(page, 3000);
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await winChallengeTree(page);
   await expect(page.locator('#result-overlay.show')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('#overlay-body')).toContainText('In real life:');
@@ -387,19 +406,19 @@ test('the Why-it-matters page shows the research, and run results teach a soluti
 test('at 0% green the whole world goes dark, and replanting revives it', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
-  await expect(page.locator('.scene-cell.grove').first()).toBeVisible(); // living wild forest
+  await expect(page.locator('.critter').first()).toBeVisible(); // beetles roam a living world
   await page.request.post('/debug/kill');
   await expect(page.locator('#green-pct')).toHaveText('0%');
   await expect(page.locator('#map-screen')).toHaveClass(/world-dead/);
-  await expect(page.locator('.scene-cell.grove')).toHaveCount(0); // groves burnt, no sway
-  await expect(page.locator('.critter').first()).toBeHidden();    // the beetles are gone too
+  await expect(page.locator('.patch.green')).toHaveCount(0);
+  await expect(page.locator('.critter').first()).toBeHidden();  // the beetles are gone
   await expect(page.locator('#map-status')).toContainText('forest is gone');
   // One replanted patch brings the world back to life
   await page.evaluate(() => {
     window.__socket.emit('restore', { idx: 0, name: 'Hope', avatar: 1 });
   });
   await expect(page.locator('#map-screen')).not.toHaveClass(/world-dead/);
-  await expect(page.locator('.scene-cell.grove').first()).toBeVisible();
+  await expect(page.locator('.critter').first()).toBeVisible();
 });
 
 test('the plague spares freshly restored patches and halts at the green floor', async ({ page }) => {
@@ -407,20 +426,20 @@ test('the plague spares freshly restored patches and halts at the green floor', 
   await enterMap(page);
   await page.request.post('/debug/kill');
   await expect(page.locator('#green-pct')).toHaveText('0%');
-  // 20 fresh restores (21% green), every one inside its grace period
+  // 80 fresh restores (16% green), every one inside its grace period
   await page.evaluate(() => {
-    for (let i = 0; i < 20; i++) window.__socket.emit('restore', { idx: i, name: 'Kid', avatar: 1 });
+    for (let i = 0; i < 80; i++) window.__socket.emit('restore', { idx: i, name: 'Kid', avatar: 1 });
   });
-  await expect(page.locator('.patch.green')).toHaveCount(20);
+  await expect(page.locator('.patch.green')).toHaveCount(80);
   for (let i = 0; i < 3; i++) await page.request.post('/debug/spread');
   await page.waitForTimeout(2500); // longer than a bulldozer's drive-in
-  await expect(page.locator('.patch.green')).toHaveCount(20); // nothing was bulldozed
+  await expect(page.locator('.patch.green')).toHaveCount(80); // nothing was bulldozed
   // Once the grace has passed the plague bites again — but only down to the
-  // floor: 15% of 96 patches means it stops at 14 green
+  // floor: 15% of 496 patches means it stops at 74 green
   for (let i = 0; i < 10; i++) await page.request.post('/debug/spread?ignoreGrace=1');
-  await expect(page.locator('.patch.green')).toHaveCount(14, { timeout: 15000 });
+  await expect(page.locator('.patch.green')).toHaveCount(74, { timeout: 20000 });
   await page.waitForTimeout(2000);
-  await expect(page.locator('.patch.green')).toHaveCount(14);
+  await expect(page.locator('.patch.green')).toHaveCount(74);
 });
 
 test('world state survives a page reload (lives on the server)', async ({ page }) => {
@@ -428,7 +447,7 @@ test('world state survives a page reload (lives on the server)', async ({ page }
   await enterMap(page);
   const gridBefore = await page.evaluate(() => worldMap.grid.join(''));
   await page.reload();
-  await expect(page.locator('.patch')).toHaveCount(96);
+  await expect(page.locator('.patch')).toHaveCount(PATCHES);
   const gridAfter = await page.evaluate(() => worldMap.grid.join(''));
   expect(gridAfter).toBe(gridBefore);
 });
@@ -487,7 +506,7 @@ test('the full board is paged by 30 and opens on the player, centered', async ({
   await expect(page.locator('#board-rows .board-row').first()).toContainText('P00');
   await expect(page.locator('#board-prev')).toBeDisabled();
   // Showing the board again (back from a run) returns to the player's page
-  await page.locator('.patch.barren').first().click();
+  await tapDeadTree(page);
   await page.click('#puzzle-quit'); // nothing at stake yet: straight back to the map
   await expect(page.locator('#world-map')).toBeVisible();
   await expect(page.locator('#board-page-label')).toHaveText('2 / 2');
@@ -524,12 +543,12 @@ test('two players share one world: a restore by one appears for the other', asyn
     localStorage.setItem('replant_account_v1', JSON.stringify({ name: 'Beta', avatar: 5 }));
   });
   await pageB.goto('/');
-  await expect(pageB.locator('.patch')).toHaveCount(96);
+  await expect(pageB.locator('.patch')).toHaveCount(PATCHES);
   await enterMap(pageA);
   await enterMap(pageB);
 
   const greenOnB = await pageB.locator('.patch.green').count();
-  await pageA.locator('.patch.barren').first().click();
+  await tapDeadTree(pageA);
   await pageA.evaluate(() => { CONFIG.CHALLENGE.GOAL_TREES = 1; }); // qualify with one tree
   await winChallengeTree(pageA);
 

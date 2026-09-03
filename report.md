@@ -147,6 +147,12 @@ rules fixed it: a restored patch is safe from the plague for ten minutes (the
 planter always sees their tree standing, sign and all), and the plague halts
 once the world is 15% green or less, so it can never be eaten to nothing.
 
+### 15. "All the trees must be clickable"
+The playable 12×8 grid had sat in the middle of a painted 32×18 scene whose
+wild groves looked like forest but were scenery. The grid now covers every
+land tile — 31×16, nearly 500 patches, with the river along the right edge
+and the fence below — so if it looks like a tree, it can be tapped.
+
 ---
 
 ## Quality practice
