@@ -42,13 +42,14 @@ function cleanAvatar(raw) {
 let pool = null;
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    // TLS with certificate verification. If the host's certificate can't be
-    // verified from the dyno, set DATABASE_SSL=no-verify (still encrypted).
-    ssl: { rejectUnauthorized: process.env.DATABASE_SSL !== 'no-verify' },
-    max: 3
-  });
+  // TLS with certificate verification. Supabase signs its pooler with its
+  // own root CA, bundled in certs/ (public; expires 2031). Any extra CA can
+  // be pointed to with DATABASE_CA_FILE; DATABASE_SSL=no-verify is the last
+  // resort (still encrypted, unverified).
+  const caFile = process.env.DATABASE_CA_FILE || path.join(__dirname, 'certs', 'supabase-prod-ca-2021.crt');
+  const ssl = { rejectUnauthorized: process.env.DATABASE_SSL !== 'no-verify' };
+  if (fs.existsSync(caFile)) ssl.ca = fs.readFileSync(caFile, 'utf8');
+  pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl, max: 3 });
   pool.on('error', e => console.error('db pool error:', e.message));
 }
 

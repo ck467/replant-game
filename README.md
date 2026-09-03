@@ -23,8 +23,9 @@ live in one `game_state` table, surviving restarts and deploys. The table is
 created on first boot; an empty database is seeded from `seed/` (the snapshot
 carried over from the file-based days). Without `DATABASE_URL` the server
 falls back to `map-state.json` / `players.json` on disk (fine locally; wiped
-on every Heroku restart). If the database host's certificate can't be
-verified, set `DATABASE_SSL=no-verify`.
+on every Heroku restart). TLS is verified against Supabase's root CA bundled
+in `certs/`; point `DATABASE_CA_FILE` at another CA for a different host, or
+set `DATABASE_SSL=no-verify` as a last resort.
 
 ## Tests
 
