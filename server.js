@@ -8,6 +8,8 @@ const PORT = process.env.PORT || 3000;
 const STATE_FILE = process.env.STATE_FILE || path.join(__dirname, 'map-state.json');
 const PLAYERS_FILE = process.env.PLAYERS_FILE || path.join(__dirname, 'players.json');
 const SEED_DIR = path.join(__dirname, 'seed');
+// Booth-staff resets must carry this key; with it unset they are disabled
+const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 // Authoritative world settings (client gets these with the map payload)
 const MAP_COLS = 12;
@@ -295,18 +297,35 @@ io.on('connection', (socket) => {
     restorePatch(barren[Math.floor(Math.random() * barren.length)], who, cleanAvatar(avatar));
   });
 
-  // Booth staff controls: a fresh map keeps the leaderboard, and a cleared
-  // leaderboard keeps the map
-  socket.on('reset-world', () => {
+  // Booth staff controls, each authorized by ADMIN_KEY: a fresh map keeps
+  // the leaderboard, and a cleared leaderboard keeps the map. The client
+  // gets an ack so it can say "wrong key" instead of silently doing nothing.
+  const authorizeAdmin = (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    if (!ADMIN_KEY) { reply({ ok: false, error: 'disabled' }); return null; }
+    if (!payload || typeof payload.key !== 'string' || payload.key !== ADMIN_KEY) {
+      reply({ ok: false, error: 'wrong-key' });
+      return null;
+    }
+    return reply;
+  };
+
+  socket.on('reset-world', (payload, ack) => {
+    const done = authorizeAdmin(payload, ack);
+    if (!done) return;
     world = { grid: generateGrid(), owners: {} };
     saveWorld();
     io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+    done({ ok: true });
   });
 
-  socket.on('reset-leaderboard', () => {
+  socket.on('reset-leaderboard', (payload, ack) => {
+    const done = authorizeAdmin(payload, ack);
+    if (!done) return;
     players = {};
     savePlayers();
     broadcastLeaderboard();
+    done({ ok: true });
   });
 
   socket.on('disconnect', () => {
@@ -315,6 +334,7 @@ io.on('connection', (socket) => {
 });
 
 async function boot() {
+  if (!ADMIN_KEY) console.warn('ADMIN_KEY not set — the admin reset buttons will be refused');
   await initStorage();
   world = validWorld(await loadState('world', STATE_FILE, path.join(SEED_DIR, 'map-state.json')))
     || { grid: generateGrid(), owners: {} };

@@ -89,8 +89,9 @@ The game converged on one loop, refined across several prompts:
 - Leftover board items carry over between trees; a completed tree flies into
   the HUD counter after lingering through its toast — and the crate stays
   open the whole time, so play never pauses for a celebration.
-- **One leaderboard: 🏆 Patch Restorers** — only players who have restored a
-  patch are listed, most patches first, fastest goal time breaking ties.
+- **One leaderboard: 🏆 Top Planters** — only players who have restored a
+  patch are listed, most patches first, fastest goal time breaking ties,
+  each name painted on a little wooden signpost.
 
 ### 9. Game feel ("juice")
 Layered feedback for every action: items pop out of the crate and arc onto
@@ -130,9 +131,10 @@ Heroku's disk is wiped on every restart, and the dyno restarts daily, so no
 leaderboard could survive a night. The world map and the players moved into a
 Supabase Postgres table (loaded on boot, written through on every change),
 with the last file-based snapshot carried over as a seed so nothing earned was
-lost. Resets are now on demand only: the admin gets two confirmed buttons,
-↺ reset the world (leaderboard kept) and 🗑️ clear the leaderboard (map
-kept). The board itself lists everyone who has restored a patch, 30 per page,
+lost. Resets are now on demand only: the admin gets two buttons, ↺ reset the
+world (leaderboard kept) and 🗑️ clear the leaderboard (map kept), each
+confirmed with an admin key that the server checks — typing "admin" as a
+name is no longer enough to wipe anything. The board itself lists everyone who has restored a patch, 30 per page,
 and opens on the player's own row, highlighted and centered, every time it is
 shown.
 
@@ -153,7 +155,9 @@ regressions).
 1. Nothing to prepare the evening before: the world and leaderboard live in
    the database and survive restarts and deploys.
 2. Morning: sign in as **admin** on a staff device → ↺ resets the world
-   fresh, and 🗑️ clears the leaderboard if you want a clean race.
+   fresh, and 🗑️ clears the leaderboard if you want a clean race. The first
+   reset asks for the admin key (the `ADMIN_KEY` set on Heroku); the device
+   remembers it after that.
 3. Kids visit the URL, make an account, and race to 4 trees.
 4. Balance knobs if needed (`public/js/config.js` / `server.js`):
    `CHALLENGE.GOAL_TREES`, `CHALLENGE.TIME_MS`, `SPAWN_WEIGHTS`,

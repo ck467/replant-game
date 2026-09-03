@@ -127,11 +127,19 @@ function confettiShower() {
   }
 }
 
-function showOverlay({ title, body, buttonText, onButton, list, button2Text, onButton2, celebrate }) {
+// input: {placeholder, value} adds a text field; its value is passed to onButton2
+function showOverlay({ title, body, buttonText, onButton, list, button2Text, onButton2, celebrate, input }) {
   document.getElementById('overlay-title').textContent = title;
   document.getElementById('overlay-body').textContent = body;
   document.querySelector('#result-overlay .overlay-card').classList.toggle('celebrate', !!celebrate);
   if (celebrate) confettiShower();
+
+  const field = document.getElementById('overlay-input');
+  field.hidden = !input;
+  if (input) {
+    field.placeholder = input.placeholder || '';
+    field.value = input.value || '';
+  }
 
   const board = document.getElementById('overlay-board');
   board.hidden = !list || list.length === 0;
@@ -150,10 +158,12 @@ function showOverlay({ title, body, buttonText, onButton, list, button2Text, onB
   btn2.hidden = !button2Text;
   if (button2Text) {
     btn2.textContent = button2Text;
-    btn2.onclick = () => { hide(); onButton2(); };
+    btn2.onclick = () => { hide(); onButton2(field.value.trim()); };
   }
+  field.onkeydown = e => { if (e.key === 'Enter' && button2Text) btn2.click(); };
 
   document.getElementById('result-overlay').classList.add('show');
+  if (input) setTimeout(() => field.focus(), 50);
 }
 
 // ----- Leaderboard panel (always on for desktop, drawer on small screens) -----
@@ -197,19 +207,19 @@ function renderLeaderboard(players) {
     const li = document.createElement('li');
     li.className = 'board-row' + (account && p.name === account.name ? ' me' : '');
 
-    const avatar = document.createElement('span');
-    avatar.className = 'avatar-sprite';
-    paintAvatar(avatar, p.avatar);
-
+    const sign = document.createElement('span');
+    sign.className = 'board-sign';
     const name = document.createElement('span');
-    name.className = 'board-name';
+    name.className = 'board-sign-name';
     name.textContent = p.name;
+    name.title = p.name;
+    sign.appendChild(name);
 
     const stats = document.createElement('span');
     stats.className = 'board-stats';
     stats.textContent = statsFor(p);
 
-    li.append(avatar, name, stats);
+    li.append(sign, stats);
     return li;
   }));
   centerMyRow();
@@ -346,27 +356,37 @@ function init() {
     }
   }, true);
 
-  // Booth staff: two separate resets, each confirmed, each leaving the other alone
-  document.getElementById('reset-btn').addEventListener('click', () => {
-    showOverlay({
-      title: '↺ Reset the world?',
-      body: 'A fresh map for EVERYONE playing — every restored patch is gone. The leaderboard is kept.',
-      buttonText: 'Cancel',
-      onButton: () => {},
-      button2Text: '↺ Reset the world',
-      onButton2: () => worldMap.reset()
-    });
+  // Booth staff: two separate resets, each confirmed with the admin key
+  // (remembered on the device once the server accepts it), each leaving
+  // the other alone
+  const ADMIN_KEY_STORE = 'replant_admin_key_v1';
+  const loadAdminKey = () => { try { return localStorage.getItem(ADMIN_KEY_STORE) || ''; } catch (e) { return ''; } };
+  const saveAdminKey = k => { try { localStorage.setItem(ADMIN_KEY_STORE, k); } catch (e) {} };
+  const onAdminReply = (key, doneMsg) => res => {
+    if (res && res.ok) { saveAdminKey(key); toast(doneMsg); }
+    else if (res && res.error === 'wrong-key') toast('🔒 Wrong admin key');
+    else toast('🔒 Resets are switched off on this server');
+  };
+  const adminConfirm = ({ title, body, action, send }) => showOverlay({
+    title, body,
+    input: { placeholder: 'Admin key', value: loadAdminKey() },
+    buttonText: 'Cancel',
+    onButton: () => {},
+    button2Text: action,
+    onButton2: key => send(key)
   });
-  document.getElementById('reset-board-btn').addEventListener('click', () => {
-    showOverlay({
-      title: '🗑️ Clear the leaderboard?',
-      body: "Every player's patches and times are erased for EVERYONE. The world map is kept.",
-      buttonText: 'Cancel',
-      onButton: () => {},
-      button2Text: '🗑️ Clear it',
-      onButton2: () => socket.emit('reset-leaderboard')
-    });
-  });
+  document.getElementById('reset-btn').addEventListener('click', () => adminConfirm({
+    title: '↺ Reset the world?',
+    body: 'A fresh map for EVERYONE playing — every restored patch is gone. The leaderboard is kept.',
+    action: '↺ Reset the world',
+    send: key => worldMap.reset(key, onAdminReply(key, '🗺️ The world starts over'))
+  }));
+  document.getElementById('reset-board-btn').addEventListener('click', () => adminConfirm({
+    title: '🗑️ Clear the leaderboard?',
+    body: "Every player's patches and times are erased for EVERYONE. The world map is kept.",
+    action: '🗑️ Clear it',
+    send: key => socket.emit('reset-leaderboard', { key }, onAdminReply(key, '🏆 Leaderboard cleared'))
+  }));
 
   startAmbient();
 }

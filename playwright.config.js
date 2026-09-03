@@ -14,6 +14,7 @@ module.exports = defineConfig({
       PORT: '3100',
       TEST_MODE: '1',
       SPREAD_DISABLED: '1',
+      ADMIN_KEY: 'test-key',
       STATE_FILE: '/tmp/replant-test-map.json'
     }
   }

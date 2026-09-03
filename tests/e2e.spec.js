@@ -149,20 +149,34 @@ test('the admin account gets two confirmed resets: world and leaderboard', async
   });
   await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
   const greenBefore = await page.locator('.patch.green').count();
-  // …clearing the leaderboard (after cancelling once) erases the board but keeps the map
+  // The server refuses resets without the key, whoever sends them
+  const refused = await page.evaluate(() => new Promise(r => window.__socket.emit('reset-leaderboard', {}, r)));
+  expect(refused.ok).toBe(false);
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
+  // The confirm asks for the key; cancelling or a wrong key changes nothing
   await page.click('#reset-board-btn');
   await expect(page.locator('#overlay-title')).toContainText('Clear the leaderboard');
+  await expect(page.locator('#overlay-input')).toBeVisible();
   await page.click('#overlay-btn'); // Cancel
-  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
   await page.click('#reset-board-btn');
+  await page.fill('#overlay-input', 'nope');
   await page.click('#overlay-btn2'); // Clear it
+  await expect(page.locator('#toast')).toContainText('Wrong admin key');
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
+  // The right key clears the board but keeps the map
+  await page.click('#reset-board-btn');
+  await page.fill('#overlay-input', 'test-key');
+  await page.click('#overlay-btn2');
   await expect(page.locator('#board-rows .board-row')).toHaveCount(0);
   await expect(page.locator('#board-empty')).toBeVisible();
   await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
-  // Resetting the world regenerates the map and leaves the (empty) board alone
+  // The accepted key is remembered on the device; resetting the world
+  // regenerates the map and leaves the (empty) board alone
   await page.click('#reset-btn');
   await expect(page.locator('#overlay-title')).toContainText('Reset the world');
+  await expect(page.locator('#overlay-input')).toHaveValue('test-key');
   await page.click('#overlay-btn2');
+  await expect(page.locator('#toast')).toContainText('world starts over');
   await expect(page.locator('.patch[title="Restored by Kid"]')).toHaveCount(0);
   await expect(page.locator('#board-rows .board-row')).toHaveCount(0);
 });
@@ -437,6 +451,9 @@ test('the full board is paged by 30 and opens on the player, centered', async ({
   await expect(page.locator('#board-page-label')).toHaveText('2 / 2');
   await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
   await expect(page.locator('#board-rows .board-row.me')).toContainText('Tester');
+  // The name is painted on a wooden signpost, not next to an avatar
+  await expect(page.locator('#board-rows .board-row.me .board-sign .board-sign-name')).toHaveText('Tester');
+  await expect(page.locator('#board-rows .avatar-sprite')).toHaveCount(0);
   const inView = await page.evaluate(() => {
     const me = document.querySelector('.board-row.me').getBoundingClientRect();
     const box = document.getElementById('board-rows').getBoundingClientRect();

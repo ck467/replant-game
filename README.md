@@ -61,15 +61,18 @@ Everything lives in `public/js/config.js`:
   patch; the ⏱️ button starts a run that greens random patches. Every
   restored patch is stamped with your avatar (hover shows "Restored by ___")
   and adds to your leaderboard total. Tune in `CONFIG.CHALLENGE`.
-- **🏆 Patch Restorers leaderboard** — only players who have restored a
+- **🏆 Top Planters leaderboard** — only players who have restored a
   patch appear, ranked by patches restored, ties broken by fastest goal
-  time. The whole board is listed, 30 per page, and every time it is shown
-  it opens on the player's own page with their row highlighted and centered.
-  Always on screen on desktop; a drawer (🏆 button) on small screens.
-  Live-updates for everyone over Socket.IO.
-- **Admin resets** — signing in as `admin` shows two confirmed buttons:
-  ↺ resets the world map (leaderboard kept) and 🗑️ clears the leaderboard
-  (map kept). Nothing resets on deploy any more.
+  time; each name is painted on a little wooden signpost. The whole board
+  is listed, 30 per page, and every time it is shown it opens on the
+  player's own page with their row highlighted and centered. Always on
+  screen on desktop; a drawer (🏆 button) on small screens. Live-updates
+  for everyone over Socket.IO.
+- **Admin resets** — signing in as `admin` shows two buttons: ↺ resets the
+  world map (leaderboard kept) and 🗑️ clears the leaderboard (map kept).
+  Each asks for the admin key, which the server checks against its
+  `ADMIN_KEY` environment variable (unset = resets refused); the device
+  remembers an accepted key. Nothing resets on deploy any more.
 - **One message band** — every message during a run (tutorial, tree
   progress, a patch lost to the plague) shows on the wood sign between the
   HUD and the board; between messages the sign cycles through the

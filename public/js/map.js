@@ -205,8 +205,9 @@ class WorldMap {
     this.socket.emit('restore', { idx, name: account.name, avatar: account.avatar });
   }
 
-  reset() {
-    this.socket.emit('reset-world');
+  // Admin only: the server checks the key and acks {ok, error}
+  reset(key, onReply) {
+    this.socket.emit('reset-world', { key }, onReply);
   }
 
   animatePatch(idx, cls) {
