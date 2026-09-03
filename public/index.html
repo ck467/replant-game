@@ -55,7 +55,8 @@
         </div>
         <button id="info-btn" class="small-btn" title="Why it matters">ℹ️</button>
         <button id="board-toggle" class="small-btn" title="Top planters">🏆</button>
-        <button id="reset-btn" class="small-btn" title="Start over (admin)" hidden>↺</button>
+        <button id="reset-btn" class="small-btn" title="Reset the world (admin)" hidden>↺</button>
+        <button id="reset-board-btn" class="small-btn" title="Clear the leaderboard (admin)" hidden>🗑️</button>
       </header>
       <p id="map-status" class="map-status"></p>
     </div>
@@ -63,6 +64,11 @@
       <h3 class="board-title">🏆 Patch Restorers</h3>
       <ol id="board-rows" class="board-rows"></ol>
       <p id="board-empty" class="board-empty">No patches restored yet — be the first!</p>
+      <div id="board-pager" class="board-pager" hidden>
+        <button id="board-prev" class="small-btn pager-btn" title="Previous page">‹</button>
+        <span id="board-page-label"></span>
+        <button id="board-next" class="small-btn pager-btn" title="Next page">›</button>
+      </div>
     </aside>
   </section>
 

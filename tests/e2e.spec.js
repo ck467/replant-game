@@ -129,10 +129,11 @@ test('rare crate drops show Lucky floating text', async ({ page }) => {
   await expect(page.locator('#ambient-puzzle .leaf').first()).toBeAttached({ timeout: 6000 });
 });
 
-test('the world reset button only appears for the admin account', async ({ page }) => {
+test('the admin account gets two confirmed resets: world and leaderboard', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
   await expect(page.locator('#reset-btn')).toBeHidden();
+  await expect(page.locator('#reset-board-btn')).toBeHidden();
   await page.addInitScript(() => {
     localStorage.setItem('replant_account_v1', JSON.stringify({ name: 'Admin', avatar: 0 }));
   });
@@ -140,6 +141,30 @@ test('the world reset button only appears for the admin account', async ({ page 
   await expect(page.locator('.patch')).toHaveCount(96);
   await enterMap(page);
   await expect(page.locator('#reset-btn')).toBeVisible();
+  await expect(page.locator('#reset-board-btn')).toBeVisible();
+  // Someone restores a patch…
+  await page.evaluate(() => {
+    const idx = +document.querySelector('.patch.barren').dataset.mapIdx;
+    window.__socket.emit('restore', { idx, name: 'Kid', avatar: 2 });
+  });
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
+  const greenBefore = await page.locator('.patch.green').count();
+  // …clearing the leaderboard (after cancelling once) erases the board but keeps the map
+  await page.click('#reset-board-btn');
+  await expect(page.locator('#overlay-title')).toContainText('Clear the leaderboard');
+  await page.click('#overlay-btn'); // Cancel
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
+  await page.click('#reset-board-btn');
+  await page.click('#overlay-btn2'); // Clear it
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(0);
+  await expect(page.locator('#board-empty')).toBeVisible();
+  await expect(page.locator('.patch.green')).toHaveCount(greenBefore);
+  // Resetting the world regenerates the map and leaves the (empty) board alone
+  await page.click('#reset-btn');
+  await expect(page.locator('#overlay-title')).toContainText('Reset the world');
+  await page.click('#overlay-btn2');
+  await expect(page.locator('.patch[title="Restored by Kid"]')).toHaveCount(0);
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(0);
 });
 
 test('a qualifying run restores the tapped patch with your avatar', async ({ page }) => {
@@ -394,6 +419,42 @@ test('leaderboard lists patch restorers, most patches first, and updates live', 
   await expect(page.locator('#board-rows .board-row').nth(0)).toContainText('🌍 2');
   await expect(page.locator('#board-rows .board-row').nth(1)).toContainText('One');
   await expect(page.locator('#board-rows .board-row').nth(1)).toContainText('🌍 1 · ⏱️ 0:41');
+});
+
+test('the full board is paged by 30 and opens on the player, centered', async ({ page }) => {
+  await freshGame(page);
+  await enterMap(page);
+  await page.setViewportSize({ width: 1280, height: 800 }); // pinned board
+  // 30 restorers ahead of Tester alphabetically (equal patches, no times)
+  await page.evaluate(() => {
+    const barren = [...document.querySelectorAll('.patch.barren')].map(p => +p.dataset.mapIdx);
+    for (let i = 0; i < 30; i++) {
+      window.__socket.emit('restore', { idx: barren[i], name: 'P' + String(i).padStart(2, '0'), avatar: 1 });
+    }
+    window.__socket.emit('restore', { idx: barren[30], name: 'Tester', avatar: 3 });
+  });
+  // The board follows the player: page 2, their row highlighted and in view
+  await expect(page.locator('#board-page-label')).toHaveText('2 / 2');
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(1);
+  await expect(page.locator('#board-rows .board-row.me')).toContainText('Tester');
+  const inView = await page.evaluate(() => {
+    const me = document.querySelector('.board-row.me').getBoundingClientRect();
+    const box = document.getElementById('board-rows').getBoundingClientRect();
+    return me.top >= box.top - 1 && me.bottom <= box.bottom + 1;
+  });
+  expect(inView).toBe(true);
+  // Paging by hand shows the first 30, ranks continuing from 1
+  await page.click('#board-prev');
+  await expect(page.locator('#board-page-label')).toHaveText('1 / 2');
+  await expect(page.locator('#board-rows .board-row')).toHaveCount(30);
+  await expect(page.locator('#board-rows .board-row').first()).toContainText('P00');
+  await expect(page.locator('#board-prev')).toBeDisabled();
+  // Showing the board again (back from a run) returns to the player's page
+  await page.locator('.patch.barren').first().click();
+  await page.click('#puzzle-quit'); // nothing at stake yet: straight back to the map
+  await expect(page.locator('#world-map')).toBeVisible();
+  await expect(page.locator('#board-page-label')).toHaveText('2 / 2');
+  await expect(page.locator('#board-rows .board-row.me')).toBeVisible();
 });
 
 test('leaderboard is pinned on desktop and a drawer on small screens', async ({ page }) => {

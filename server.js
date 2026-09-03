@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const PORT = process.env.PORT || 3000;
 const STATE_FILE = process.env.STATE_FILE || path.join(__dirname, 'map-state.json');
 const PLAYERS_FILE = process.env.PLAYERS_FILE || path.join(__dirname, 'players.json');
+const SEED_DIR = path.join(__dirname, 'seed');
 
 // Authoritative world settings (client gets these with the map payload)
 const MAP_COLS = 12;
@@ -33,6 +34,76 @@ function cleanAvatar(raw) {
   return Number.isInteger(n) && n >= 0 && n < AVATAR_COUNT ? n : 0;
 }
 
+// ---------- Storage ----------
+// With DATABASE_URL set (Supabase Postgres on Heroku) the world and the
+// players survive restarts and deploys. Without it (local dev, tests) they
+// live in JSON files next to the server, which Heroku wipes on every restart.
+
+let pool = null;
+if (process.env.DATABASE_URL) {
+  const { Pool } = require('pg');
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // TLS with certificate verification. If the host's certificate can't be
+    // verified from the dyno, set DATABASE_SSL=no-verify (still encrypted).
+    ssl: { rejectUnauthorized: process.env.DATABASE_SSL !== 'no-verify' },
+    max: 3
+  });
+  pool.on('error', e => console.error('db pool error:', e.message));
+}
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return null; }
+}
+
+// Writes are fire-and-forget but serialized per key, so the latest state
+// always lands last.
+const writeQueue = {};
+function persist(key, file, value) {
+  if (!pool) {
+    try { fs.writeFileSync(file, JSON.stringify(value)); } catch (e) {}
+    return;
+  }
+  const json = JSON.stringify(value);
+  writeQueue[key] = (writeQueue[key] || Promise.resolve())
+    .then(() => pool.query(
+      'INSERT INTO game_state (key, value) VALUES ($1, $2::jsonb) ' +
+      'ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()',
+      [key, json]
+    ))
+    .catch(e => console.error(`db: saving ${key} failed:`, e.message));
+}
+
+async function loadState(key, file, seedFile) {
+  if (!pool) return readJson(file) ?? readJson(seedFile);
+  const r = await pool.query('SELECT value FROM game_state WHERE key = $1', [key]);
+  if (r.rows.length) return r.rows[0].value;
+  // First boot against an empty database: carry over the snapshot taken
+  // from the old file-based server so nothing already earned is lost.
+  const seed = readJson(seedFile);
+  if (seed) console.log(`db: no ${key} yet — seeding from ${path.basename(seedFile)}`);
+  return seed;
+}
+
+async function initStorage() {
+  if (!pool) return;
+  try {
+    await pool.query(
+      'CREATE TABLE IF NOT EXISTS game_state (' +
+      'key text PRIMARY KEY, value jsonb NOT NULL, ' +
+      'updated_at timestamptz NOT NULL DEFAULT now())'
+    );
+    // A free Supabase project pauses after a week without traffic
+    setInterval(() => pool.query('SELECT 1').catch(() => {}), 6 * 60 * 60 * 1000);
+    console.log('db: connected');
+  } catch (e) {
+    // Keep the game up on an unreachable database — but nothing will
+    // persist until the next restart finds it again.
+    console.error('db: unreachable, falling back to files:', e.message);
+    pool = null;
+  }
+}
+
 // ---------- Shared world state ----------
 
 function generateGrid() {
@@ -46,49 +117,40 @@ function generateGrid() {
   return grid;
 }
 
-function loadWorld() {
-  try {
-    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-    if (Array.isArray(data) && data.length === MAP_COLS * MAP_ROWS) {
-      return { grid: data, owners: {} }; // legacy format
-    }
-    if (data && Array.isArray(data.grid) && data.grid.length === MAP_COLS * MAP_ROWS) {
-      return { grid: data.grid, owners: data.owners || {} };
-    }
-  } catch (e) { /* first boot or corrupt file — regenerate */ }
-  return null;
+function validWorld(data) {
+  if (Array.isArray(data) && data.length === MAP_COLS * MAP_ROWS) {
+    return { grid: data, owners: {} }; // legacy format
+  }
+  if (data && Array.isArray(data.grid) && data.grid.length === MAP_COLS * MAP_ROWS) {
+    return { grid: data.grid, owners: data.owners || {} };
+  }
+  return null; // first boot or corrupt — regenerate
 }
 
-let world = loadWorld() || { grid: generateGrid(), owners: {} };
+let world = null; // set in boot()
 
 function saveWorld() {
-  try { fs.writeFileSync(STATE_FILE, JSON.stringify(world)); } catch (e) {}
+  persist('world', STATE_FILE, world);
 }
-saveWorld();
 
 // ---------- Players & leaderboard ----------
 // players: { name -> { name, avatar, trees, patches, bestTimeMs | null } }
 // The board lists only players who have restored a patch, most patches first,
 // fastest goal time breaking ties.
 
-function loadPlayers() {
-  try {
-    const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
-    if (players && typeof players === 'object') {
-      Object.values(players).forEach(p => { // older saves predate patch counts
-        p.patches = p.patches || 0;
-        if (p.bestTimeMs === undefined) p.bestTimeMs = null;
-      });
-      return players;
-    }
-  } catch (e) { /* first boot */ }
-  return {};
+function validPlayers(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  Object.values(data).forEach(p => { // older saves predate patch counts
+    p.patches = p.patches || 0;
+    if (p.bestTimeMs === undefined) p.bestTimeMs = null;
+  });
+  return data;
 }
 
-let players = loadPlayers();
+let players = {}; // set in boot()
 
 function savePlayers() {
-  try { fs.writeFileSync(PLAYERS_FILE, JSON.stringify(players)); } catch (e) {}
+  persist('players', PLAYERS_FILE, players);
 }
 
 function getPlayer(name, avatar) {
@@ -107,12 +169,13 @@ function rankedPlayers() {
     );
 }
 
+// The whole board goes out: the client pages through it
 function broadcastLeaderboard() {
-  io.emit('leaderboard', rankedPlayers().slice(0, 50));
+  io.emit('leaderboard', rankedPlayers());
 }
 
 app.get('/api/leaderboard', (req, res) => {
-  res.json(rankedPlayers().slice(0, 50));
+  res.json(rankedPlayers());
 });
 
 // A finished timed-challenge run: remember the player's fastest goal time
@@ -210,7 +273,7 @@ if (process.env.TEST_MODE) {
 
 io.on('connection', (socket) => {
   socket.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
-  socket.emit('leaderboard', rankedPlayers().slice(0, 10));
+  socket.emit('leaderboard', rankedPlayers());
   io.emit('players', io.engine.clientsCount);
 
   // A won patch puzzle restores the chosen patch in the player's name
@@ -231,10 +294,18 @@ io.on('connection', (socket) => {
     restorePatch(barren[Math.floor(Math.random() * barren.length)], who, cleanAvatar(avatar));
   });
 
+  // Booth staff controls: a fresh map keeps the leaderboard, and a cleared
+  // leaderboard keeps the map
   socket.on('reset-world', () => {
     world = { grid: generateGrid(), owners: {} };
     saveWorld();
     io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+  });
+
+  socket.on('reset-leaderboard', () => {
+    players = {};
+    savePlayers();
+    broadcastLeaderboard();
   });
 
   socket.on('disconnect', () => {
@@ -242,6 +313,16 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Replant running at http://localhost:${PORT}`);
-});
+async function boot() {
+  await initStorage();
+  world = validWorld(await loadState('world', STATE_FILE, path.join(SEED_DIR, 'map-state.json')))
+    || { grid: generateGrid(), owners: {} };
+  saveWorld();
+  players = validPlayers(await loadState('players', PLAYERS_FILE, path.join(SEED_DIR, 'players.json')));
+  savePlayers();
+  server.listen(PORT, () => {
+    console.log(`Replant running at http://localhost:${PORT} (${pool ? 'database' : 'file'} storage)`);
+  });
+}
+
+boot().catch(e => { console.error('failed to start:', e); process.exit(1); });

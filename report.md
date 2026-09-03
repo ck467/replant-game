@@ -87,10 +87,10 @@ The game converged on one loop, refined across several prompts:
 - **Qualification rule**: only reaching 4 trees restores the tapped patch.
   Quitting (with a confirmation warning) or falling short restores nothing.
 - Leftover board items carry over between trees; a completed tree flies into
-  the HUD counter after lingering through its toast.
-- **Two leaderboard tabs** (the student's design): 🌳 All-time lifetime trees,
-  and ⏱️ Today's race — who reached 4 trees fastest, resetting daily for the
-  exhibition.
+  the HUD counter after lingering through its toast — and the crate stays
+  open the whole time, so play never pauses for a celebration.
+- **One leaderboard: 🏆 Patch Restorers** — only players who have restored a
+  patch are listed, most patches first, fastest goal time breaking ties.
 
 ### 9. Game feel ("juice")
 Layered feedback for every action: items pop out of the crate and arc onto
@@ -122,27 +122,38 @@ scrolling roster and outside-tap dismissal.
 ### 12. "Deploy so her classmates can play"
 Repository published to GitHub (ck467/replant-game) and deployed to Heroku on
 a Basic dyno (no sleeping), verified end-to-end on the live URL including
-WebSockets and the leaderboard. An `admin` account gates the world-reset
-button for booth staff.
+WebSockets and the leaderboard. An `admin` account gates the reset buttons
+for booth staff.
+
+### 13. "The data is lost each time" — a real database
+Heroku's disk is wiped on every restart, and the dyno restarts daily, so no
+leaderboard could survive a night. The world map and the players moved into a
+Supabase Postgres table (loaded on boot, written through on every change),
+with the last file-based snapshot carried over as a seed so nothing earned was
+lost. Resets are now on demand only: the admin gets two confirmed buttons,
+↺ reset the world (leaderboard kept) and 🗑️ clear the leaderboard (map
+kept). The board itself lists everyone who has restored a patch, 30 per page,
+and opens on the player's own row, highlighted and centered, every time it is
+shown.
 
 ---
 
 ## Quality practice
 
-Every feature landed with Playwright end-to-end coverage — **17 tests** at the
+Every feature landed with Playwright end-to-end coverage — **20 tests** at the
 time of writing, spanning account creation, the tutorial, merging (tap and
-drag), the qualification rule, quit warnings, leaderboard tabs and drawer
-behavior, bulldozer destruction, the dead-world state, and two-browser
-real-time multiplayer. Testing repeatedly caught real UX bugs before players
+drag), the qualification rule, quit warnings, the message band, leaderboard
+paging and drawer behavior, the admin resets, bulldozer destruction, the
+dead-world state, and two-browser real-time multiplayer. Testing repeatedly caught real UX bugs before players
 did (dead buttons during celebrations, click-stealing overlays, layout
 regressions).
 
 ## Exhibition-day runbook
 
-1. The evening before: `heroku restart -a replant-game` (the daily dyno cycle
-   then lands overnight; a restart wipes the leaderboard/world, so never
-   deploy during the exhibition).
-2. Morning: sign in as **admin** on a staff device → ↺ resets the world fresh.
+1. Nothing to prepare the evening before: the world and leaderboard live in
+   the database and survive restarts and deploys.
+2. Morning: sign in as **admin** on a staff device → ↺ resets the world
+   fresh, and 🗑️ clears the leaderboard if you want a clean race.
 3. Kids visit the URL, make an account, and race to 4 trees.
 4. Balance knobs if needed (`public/js/config.js` / `server.js`):
    `CHALLENGE.GOAL_TREES`, `CHALLENGE.TIME_MS`, `SPAWN_WEIGHTS`,
@@ -152,6 +163,6 @@ regressions).
 
 The game's structure *is* the argument: bulldozers embody greed; the plague
 punishes neglect; restoration takes real effort (4 trees, earned); individual
-contribution is honored forever (All-time tab) even when the world loses
-ground; and the world itself can die from inaction — or be revived by a
-single player who plants again.
+contribution is honored for good (every restorer stays on the board) even
+when the world loses ground; and the world itself can die from inaction — or
+be revived by a single player who plants again.

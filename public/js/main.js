@@ -8,6 +8,8 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
   // Screen changes always tuck the leaderboard drawer away
   document.getElementById('leaderboard').classList.remove('open');
+  // On desktop the board is pinned to the map: coming back re-centers the player
+  if (id === 'map-screen') focusLeaderboard();
 }
 
 function updateHud() {
@@ -162,13 +164,33 @@ function formatRunTime(ms) {
 }
 
 // Players who have restored a patch: the server pre-sorts by patches, then
-// by fastest goal time.
+// by fastest goal time. The full board arrives; the panel pages through it,
+// and whenever it is shown it opens on the player's own page with their
+// row centered.
+const BOARD_PAGE_SIZE = 30;
+let boardPlayers = [];
+let boardPage = 0;
+let boardFollowMe = true; // stick to the player's page until they page by hand
+
 function renderLeaderboard(players) {
+  if (players) boardPlayers = players;
   const rows = document.getElementById('board-rows');
   const empty = document.getElementById('board-empty');
-  const list = players.slice(0, 10);
+  const pages = Math.max(1, Math.ceil(boardPlayers.length / BOARD_PAGE_SIZE));
+  const myIdx = account ? boardPlayers.findIndex(p => p.name === account.name) : -1;
+  if (boardFollowMe && myIdx >= 0) boardPage = Math.floor(myIdx / BOARD_PAGE_SIZE);
+  boardPage = Math.max(0, Math.min(boardPage, pages - 1));
+  const start = boardPage * BOARD_PAGE_SIZE;
+  const list = boardPlayers.slice(start, start + BOARD_PAGE_SIZE);
+  rows.style.counterReset = `rank ${start}`; // ranks continue across pages
   const statsFor = p => `🌍 ${p.patches}` +
     (p.bestTimeMs != null ? ` · ⏱️ ${formatRunTime(p.bestTimeMs)}` : '');
+
+  const pager = document.getElementById('board-pager');
+  pager.hidden = pages <= 1;
+  document.getElementById('board-page-label').textContent = `${boardPage + 1} / ${pages}`;
+  document.getElementById('board-prev').disabled = boardPage === 0;
+  document.getElementById('board-next').disabled = boardPage >= pages - 1;
 
   empty.hidden = list.length > 0;
   rows.replaceChildren(...list.map(p => {
@@ -190,6 +212,32 @@ function renderLeaderboard(players) {
     li.append(avatar, name, stats);
     return li;
   }));
+  centerMyRow();
+}
+
+// Scroll the list so the player's own row sits in the middle of the panel
+function centerMyRow() {
+  const rows = document.getElementById('board-rows');
+  const me = rows.querySelector('.board-row.me');
+  if (!me || !rows.clientHeight) return;
+  rows.scrollTop = (me.offsetTop - rows.offsetTop) - (rows.clientHeight - me.offsetHeight) / 2;
+}
+
+// Every time the board is shown it jumps back to the player's page
+function focusLeaderboard() {
+  boardFollowMe = true;
+  renderLeaderboard();
+}
+
+function showLeaderboard() {
+  focusLeaderboard();
+  document.getElementById('leaderboard').classList.add('open');
+}
+
+function turnBoardPage(delta) {
+  boardFollowMe = false;
+  boardPage += delta;
+  renderLeaderboard();
 }
 
 // ----- Account entry -----
@@ -261,8 +309,10 @@ function init() {
   socket.on('leaderboard', renderLeaderboard);
 
   setupIntro(() => {
-    // Only the booth admin sees the world-reset button
-    document.getElementById('reset-btn').hidden = account.name.toLowerCase() !== 'admin';
+    // Only the booth admin sees the reset buttons
+    const isAdmin = account.name.toLowerCase() === 'admin';
+    document.getElementById('reset-btn').hidden = !isAdmin;
+    document.getElementById('reset-board-btn').hidden = !isAdmin;
     showScreen('map-screen');
     updateHud();
   });
@@ -281,8 +331,12 @@ function init() {
   });
 
   document.getElementById('board-toggle').addEventListener('click', () => {
-    document.getElementById('leaderboard').classList.toggle('open');
+    const drawer = document.getElementById('leaderboard');
+    if (drawer.classList.contains('open')) drawer.classList.remove('open');
+    else showLeaderboard();
   });
+  document.getElementById('board-prev').addEventListener('click', () => turnBoardPage(-1));
+  document.getElementById('board-next').addEventListener('click', () => turnBoardPage(1));
   // Tapping anywhere outside the open drawer dismisses it
   document.addEventListener('pointerdown', e => {
     const drawer = document.getElementById('leaderboard');
@@ -292,8 +346,26 @@ function init() {
     }
   }, true);
 
+  // Booth staff: two separate resets, each confirmed, each leaving the other alone
   document.getElementById('reset-btn').addEventListener('click', () => {
-    if (confirm('Start the world over for EVERYONE playing?')) worldMap.reset();
+    showOverlay({
+      title: '↺ Reset the world?',
+      body: 'A fresh map for EVERYONE playing — every restored patch is gone. The leaderboard is kept.',
+      buttonText: 'Cancel',
+      onButton: () => {},
+      button2Text: '↺ Reset the world',
+      onButton2: () => worldMap.reset()
+    });
+  });
+  document.getElementById('reset-board-btn').addEventListener('click', () => {
+    showOverlay({
+      title: '🗑️ Clear the leaderboard?',
+      body: "Every player's patches and times are erased for EVERYONE. The world map is kept.",
+      buttonText: 'Cancel',
+      onButton: () => {},
+      button2Text: '🗑️ Clear it',
+      onButton2: () => socket.emit('reset-leaderboard')
+    });
   });
 
   startAmbient();

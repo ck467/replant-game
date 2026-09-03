@@ -174,7 +174,7 @@ class Challenge {
       onButton: () => {
         // Back on the map, show them where they landed on the board
         this.showScreen('map-screen');
-        document.getElementById('leaderboard').classList.add('open');
+        showLeaderboard();
       }
     });
   }

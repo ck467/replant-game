@@ -15,6 +15,17 @@ npm install
 npm start          # http://localhost:3000
 ```
 
+## Persistence
+
+Set `DATABASE_URL` to a Postgres connection string (the live game uses a
+Supabase project's **session pooler** URL) and the world map and leaderboard
+live in one `game_state` table, surviving restarts and deploys. The table is
+created on first boot; an empty database is seeded from `seed/` (the snapshot
+carried over from the file-based days). Without `DATABASE_URL` the server
+falls back to `map-state.json` / `players.json` on disk (fine locally; wiped
+on every Heroku restart). If the database host's certificate can't be
+verified, set `DATABASE_SSL=no-verify`.
+
 ## Tests
 
 ```bash
@@ -51,9 +62,13 @@ Everything lives in `public/js/config.js`:
   and adds to your leaderboard total. Tune in `CONFIG.CHALLENGE`.
 - **🏆 Patch Restorers leaderboard** — only players who have restored a
   patch appear, ranked by patches restored, ties broken by fastest goal
-  time. Always on screen on desktop; a drawer (🏆 button) on small screens.
-  Live-updates for everyone over Socket.IO. Player data persists in
-  `players.json` — delete it to clear the board for a new day.
+  time. The whole board is listed, 30 per page, and every time it is shown
+  it opens on the player's own page with their row highlighted and centered.
+  Always on screen on desktop; a drawer (🏆 button) on small screens.
+  Live-updates for everyone over Socket.IO.
+- **Admin resets** — signing in as `admin` shows two confirmed buttons:
+  ↺ resets the world map (leaderboard kept) and 🗑️ clears the leaderboard
+  (map kept). Nothing resets on deploy any more.
 - **One message band** — every message during a run (tutorial, tree
   progress, a patch lost to the plague) shows on the wood sign between the
   HUD and the board; between messages the sign cycles through the
@@ -62,10 +77,10 @@ Everything lives in `public/js/config.js`:
 ## Multiplayer
 
 The world map is **shared by everyone**. The server owns the grid (persisted to
-`map-state.json`), runs the deforestation timer, and broadcasts every change
-over Socket.IO — so when one player restores a patch, all connected players see
-it turn green instantly. The HUD shows how many players are online. The ↺
-button resets the world for everyone (booth-admin use).
+the database, or `map-state.json` locally), runs the deforestation timer, and
+broadcasts every change over Socket.IO — so when one player restores a patch,
+all connected players see it turn green instantly. The HUD shows how many
+players are online.
 
 Puzzle sessions are per-player and run entirely in the browser.
 
