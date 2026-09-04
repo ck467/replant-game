@@ -16,6 +16,18 @@ function updateHud() {
   const pct = worldMap.greenPct();
   document.getElementById('green-pct').textContent = pct + '%';
   document.getElementById('green-bar-fill').style.width = pct + '%';
+  // The world grows when it's green enough: show how close everyone is
+  const hint = document.getElementById('expand-hint');
+  const total = worldMap.grid.length;
+  const green = worldMap.grid.filter(v => v === 'g').length;
+  if (worldMap.maxed) {
+    hint.textContent = '🌍 The forest has grown as far as it can!';
+  } else {
+    const need = Math.max(0, Math.ceil(total * worldMap.expandAt / 100) - green);
+    hint.textContent = need > 0
+      ? `🌱 ${need} more green ${need === 1 ? 'patch' : 'patches'} and the forest grows!`
+      : '🌱 The forest is about to grow!';
+  }
   const status = document.getElementById('map-status');
   if (pct >= CONFIG.RESTORE_GOAL_PCT) {
     status.textContent = '🎉 Balance restored! The forest is thriving again.';
@@ -313,7 +325,12 @@ function init() {
       const impact = CONFIG.IMPACTS[Math.floor(Math.random() * CONFIG.IMPACTS.length)];
       toast(`🪓 Deforestation spread — ${impact}!`);
     },
-    onChange: () => updateHud()
+    onChange: () => updateHud(),
+    // Everyone's restoring paid off: new land appeared around the edges
+    onGrow: () => {
+      toast('🌍 The forest grows! New land has appeared around the edges — go explore!', 4500);
+      confettiShower();
+    }
   });
 
   socket.on('leaderboard', renderLeaderboard);

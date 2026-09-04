@@ -1,45 +1,56 @@
 // World map: a socket-driven view of the shared world.
 // The server owns the grid; this class renders it and forwards actions.
 //
-// The screen is a fixed, expansive 32x18 tile scene — bigger than most
-// viewports — that the player pans around, at 64px per tile (4x pixel
-// scale). Every land tile is a playable patch (the 31x16 grid, starting at
-// the top-left corner); a river runs down the right edge into a full-width
-// channel along the bottom, and a fence closes the last row. There is no
-// painted-on forest: if it looks like a tree, it can be tapped.
+// The screen is an expansive tile scene — bigger than most viewports — that
+// the player pans around, at 64px per tile (4x pixel scale). Every land
+// tile is a playable patch (the server's cols x rows grid, from the top-left
+// corner); a river runs down the right edge into a full-width channel along
+// the bottom, and a fence closes the last row. There is no painted-on
+// forest: if it looks like a tree, it can be tapped. The world GROWS: the
+// server adds a ring of land whenever it is green enough.
 const SCENE = {
-  COLS: 32,
-  ROWS: 18,
   TILE: 64,
-  PLAY_COL: 0,
-  PLAY_ROW: 0,
-  RIVER_COL: 31, // straight channel down into the bottom river
-  RIVER_ROW: 16,
-  FENCE_ROW: 17,
   HB: 'assets/blind_hummingbird_spritesheet_16x16.png',    // 8x4 sheet
   DECOR: 'assets/forest_decoration_set_16x16.png'          // 8x4 sheet
 };
 
+// Decoration-sheet tiles [col, row] that suit the dead zone: stones, a rock, a log, a boulder
+const DEAD_DECOR = [[0, 0], [1, 0], [2, 0], [6, 0]];
+
 class WorldMap {
-  constructor(socket, { onPatchClick, onSpread, onChange }) {
+  constructor(socket, { onPatchClick, onSpread, onChange, onGrow }) {
     this.socket = socket;
     this.onPatchClick = onPatchClick;
     this.onSpread = onSpread;
     this.onChange = onChange;
+    this.onGrow = onGrow;
     this.cols = CONFIG.MAP_COLS;
     this.rows = CONFIG.MAP_ROWS;
     this.grid = [];
+    this.expandAt = 60;
+    this.maxed = false;
     this.el = document.getElementById('world-map');
 
     this.owners = {};
 
-    socket.on('map', ({ cols, rows, grid, owners }) => {
+    socket.on('map', ({ cols, rows, grid, owners, expandAt, maxed, grew }) => {
+      // A new ring adds one tile on every side: shift the view and the
+      // roaming sprites along with it so nothing on screen jumps
+      const shift = this.grid.length && cols > this.cols ? ((cols - this.cols) / 2) * SCENE.TILE : 0;
       this.cols = cols;
       this.rows = rows;
       this.grid = grid;
       this.owners = owners || {};
+      if (expandAt !== undefined) this.expandAt = expandAt;
+      this.maxed = !!maxed;
+      if (shift) {
+        this.panX -= shift;
+        this.panY -= shift;
+        [...this.dozers, ...this.critters].forEach(s => { s.x += shift; s.y += shift; });
+      }
       this.render();
       this.onChange();
+      if (grew && this.onGrow) this.onGrow();
     });
 
     this.initPan();
@@ -50,7 +61,7 @@ class WorldMap {
         this.grid[idx] = state;
         if (state === 'g' && owner) this.owners[idx] = owner;
         else delete this.owners[idx];
-        this.render();
+        this.updatePatch(idx); // just this tile — the world is big
         this.animatePatch(idx, state === 'g' ? 'patch-restored' : 'patch-lost');
         if (cause === 'spread') this.onSpread();
         this.onChange();
@@ -61,11 +72,19 @@ class WorldMap {
     });
   }
 
+  // The scene is the grid plus a river column on the right and a river
+  // channel + fence row along the bottom
+  get sceneCols() { return this.cols + 1; }
+  get sceneRows() { return this.rows + 2; }
+  get riverCol() { return this.cols; }
+  get riverRow() { return this.rows; }
+  get fenceRow() { return this.rows + 1; }
+
   // ----- Bulldozers: the deforestation made visible -----
 
   patchScenePx(idx) {
-    const c = SCENE.PLAY_COL + (idx % this.cols);
-    const r = SCENE.PLAY_ROW + Math.floor(idx / this.cols);
+    const c = idx % this.cols;
+    const r = Math.floor(idx / this.cols);
     return { x: c * SCENE.TILE, y: r * SCENE.TILE };
   }
 
@@ -90,9 +109,9 @@ class WorldMap {
       if (!cr.el || Math.random() < 0.35) return; // beetles nap a lot
       let c, r;
       do {
-        c = Math.floor(Math.random() * SCENE.COLS);
-        r = 1 + Math.floor(Math.random() * (SCENE.RIVER_ROW - 2));
-      } while (c === SCENE.RIVER_COL); // beetles can't swim
+        c = Math.floor(Math.random() * this.sceneCols);
+        r = 1 + Math.floor(Math.random() * (this.riverRow - 2));
+      } while (c === this.riverCol); // beetles can't swim
       const x = c * SCENE.TILE, y = r * SCENE.TILE;
       cr.flip = x > cr.x;
       cr.el.classList.toggle('flip', cr.flip);
@@ -216,10 +235,10 @@ class WorldMap {
   buildSceneCell(c, r) {
     const cell = document.createElement('div');
     cell.className = 'scene-cell';
-    const isRiver = c === SCENE.RIVER_COL && r < SCENE.RIVER_ROW || r === SCENE.RIVER_ROW;
+    const isRiver = c === this.riverCol && r < this.riverRow || r === this.riverRow;
     if (isRiver) {
-      cell.classList.add(r === SCENE.RIVER_ROW ? 'water-h' : 'water-v');
-    } else if (r === SCENE.FENCE_ROW) {
+      cell.classList.add(r === this.riverRow ? 'water-h' : 'water-v');
+    } else if (r === this.fenceRow) {
       WorldMap.sprite(cell, SCENE.DECOR, 6, 2); // fence line along the bottom
     } else {
       cell.style.background = "url('assets/grass_16.png')";
@@ -243,6 +262,16 @@ class WorldMap {
       // Every barren patch is a grey dead tree — the thing you restore
       patch.addEventListener('click', () => this.onPatchClick(idx));
       patch.title = 'Restore this tree!';
+      // The dead zone isn't one flat grey: the scorched ground varies, and
+      // some tiles have a rock, a log, or a stump beside the dead tree
+      patch.classList.add('ash-' + (h % 3));
+      if (h < 30) {
+        const [col, row] = DEAD_DECOR[h % DEAD_DECOR.length];
+        const decor = document.createElement('span');
+        decor.className = 'patch-decor';
+        decor.style.backgroundPosition = `${(col / 7 * 100).toFixed(4)}% ${(row / 3 * 100).toFixed(4)}%`;
+        patch.appendChild(decor);
+      }
     } else {
       patch.disabled = true; // living forest is scenery, not a button
       // Randomize the wind sway so the forest doesn't move in lockstep
@@ -264,23 +293,32 @@ class WorldMap {
     return patch;
   }
 
-  render() {
-    // 0% green = total collapse: the whole map goes dark and lifeless
+  // 0% green = total collapse: the whole map goes dark and lifeless
+  updateDeadState() {
     this.worldDead = this.grid.length > 0 && !this.grid.includes('g');
     document.getElementById('map-screen').classList.toggle('world-dead', this.worldDead);
-    this.el.style.gridTemplateColumns = `repeat(${SCENE.COLS}, var(--tile))`;
+  }
+
+  // Full rebuild: on arrival and whenever the world grows
+  render() {
+    this.updateDeadState();
+    this.el.style.gridTemplateColumns = `repeat(${this.sceneCols}, var(--tile))`;
     this.el.innerHTML = '';
-    for (let r = 0; r < SCENE.ROWS; r++) {
-      for (let c = 0; c < SCENE.COLS; c++) {
-        const pc = c - SCENE.PLAY_COL;
-        const pr = r - SCENE.PLAY_ROW;
-        const inPlay = pc >= 0 && pc < this.cols && pr >= 0 && pr < this.rows;
-        this.el.appendChild(
-          inPlay ? this.buildPatch(pr * this.cols + pc) : this.buildSceneCell(c, r)
-        );
+    for (let r = 0; r < this.sceneRows; r++) {
+      for (let c = 0; c < this.sceneCols; c++) {
+        const inPlay = c < this.cols && r < this.rows;
+        this.el.appendChild(inPlay ? this.buildPatch(r * this.cols + c) : this.buildSceneCell(c, r));
       }
     }
     if (this.dozers) this.renderDozers();
+    this.applyPan();
+  }
+
+  // One tile changed: swap just that element
+  updatePatch(idx) {
+    const old = this.el.querySelector(`[data-map-idx="${idx}"]`);
+    if (old) old.replaceWith(this.buildPatch(idx));
+    this.updateDeadState();
   }
 
   // ----- Panning: the world is bigger than the screen; drag to explore -----
@@ -334,8 +372,8 @@ class WorldMap {
   }
 
   applyPan() {
-    const w = SCENE.COLS * SCENE.TILE;
-    const h = SCENE.ROWS * SCENE.TILE;
+    const w = this.sceneCols * SCENE.TILE;
+    const h = this.sceneRows * SCENE.TILE;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     // Clamp so the scene edge never leaves a gap; center if it fits entirely
@@ -345,8 +383,8 @@ class WorldMap {
   }
 
   centerOnPlayGrid() {
-    const cx = (SCENE.PLAY_COL + this.cols / 2) * SCENE.TILE;
-    const cy = (SCENE.PLAY_ROW + this.rows / 2) * SCENE.TILE;
+    const cx = (this.cols / 2) * SCENE.TILE;
+    const cy = (this.rows / 2) * SCENE.TILE;
     this.panX = window.innerWidth / 2 - cx;
     this.panY = window.innerHeight / 2 - cy;
     this.applyPan();

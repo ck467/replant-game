@@ -12,14 +12,20 @@ const SEED_DIR = path.join(__dirname, 'seed');
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 // Authoritative world settings (client gets these with the map payload)
-const MAP_COLS = 31; // every land tile of the client's 32x18 scene is a patch
-const MAP_ROWS = 16;
+// The world starts as every land tile of the client's 32x18 scene…
+const START_COLS = 31;
+const START_ROWS = 16;
+// …and GROWS: whenever the land is EXPAND_AT_PCT green, a ring of new land
+// (mostly barren, with wild green pockets) appears around it, up to
+// MAX_EXPANSIONS rings (31x16 → 51x36).
+const EXPAND_AT_PCT = process.env.EXPAND_AT_PCT !== undefined
+  ? parseFloat(process.env.EXPAND_AT_PCT) : 60;
+const MAX_EXPANSIONS = 10;
+const NEW_LAND_GREEN_PCT = 22;
 const SPREAD_INTERVAL_MS = 90000; // rebalanced: a run now restores ONE patch
-// A freshly restored patch is safe from the plague for this long, so a
-// planter always gets to see their tree standing with their sign on it
-const RESTORE_GRACE_MS = parseInt(process.env.RESTORE_GRACE_MS, 10) || 10 * 60 * 1000;
-// …and the plague halts once the world is this green or less, so it can
-// never be eaten to nothing while the booth is busy
+// The plague only ever eats WILD green — a patch a planter restored is
+// theirs for good — and it halts once the world is this green or less, so
+// it can never be eaten to nothing while the booth is busy
 const PLAGUE_FLOOR_PCT = process.env.PLAGUE_FLOOR_PCT !== undefined
   ? parseFloat(process.env.PLAGUE_FLOOR_PCT) : 15;
 const AVATAR_COUNT = 20;
@@ -116,31 +122,82 @@ async function initStorage() {
 
 // ---------- Shared world state ----------
 
-function generateGrid() {
+// Half green (left), half barren (right), with a ragged frontier
+function generateGrid(cols, rows) {
   const grid = [];
-  for (let r = 0; r < MAP_ROWS; r++) {
-    const frontier = Math.floor(MAP_COLS / 2) + (Math.floor(Math.random() * 5) - 2);
-    for (let c = 0; c < MAP_COLS; c++) {
+  for (let r = 0; r < rows; r++) {
+    const frontier = Math.floor(cols / 2) + (Math.floor(Math.random() * 5) - 2);
+    for (let c = 0; c < cols; c++) {
       grid.push(c < frontier ? 'g' : 'b');
     }
   }
   return grid;
 }
 
-// world: { grid: ['g'|'b'...], owners: {idx -> {name, avatar}},
-//          protected: {idx -> ms timestamp the plague may touch it again} }
+// world: { cols, rows, grid: ['g'|'b'...], owners: {idx -> {name, avatar}},
+//          expansions: rings of land added so far }
 function freshWorld() {
-  return { grid: generateGrid(), owners: {}, protected: {} };
+  return {
+    cols: START_COLS,
+    rows: START_ROWS,
+    grid: generateGrid(START_COLS, START_ROWS),
+    owners: {},
+    expansions: 0
+  };
 }
 
 function validWorld(data) {
-  if (Array.isArray(data) && data.length === MAP_COLS * MAP_ROWS) {
-    return { grid: data, owners: {}, protected: {} }; // legacy format
+  if (!data || !Array.isArray(data.grid)) return null;
+  const cols = data.cols || START_COLS;
+  const rows = data.rows || START_ROWS;
+  if (data.grid.length !== cols * rows) return null; // corrupt or an older layout — regenerate
+  return { cols, rows, grid: data.grid, owners: data.owners || {}, expansions: data.expansions || 0 };
+}
+
+function mapPayload(extra = {}) {
+  return {
+    cols: world.cols,
+    rows: world.rows,
+    grid: world.grid,
+    owners: world.owners,
+    expandAt: EXPAND_AT_PCT,
+    maxed: world.expansions >= MAX_EXPANSIONS,
+    ...extra
+  };
+}
+
+// Wild green in the new land comes in 2x2 clumps, not salt-and-pepper
+function wildPocket(c, r, seed) {
+  return (Math.imul((c >> 1) * 97 + (r >> 1) * 193 + seed, 2654435761) >>> 0) % 100 < NEW_LAND_GREEN_PCT;
+}
+
+// Once the land is green enough, a ring of new land appears around it. The
+// old world shifts one tile right and down inside the bigger grid; every
+// planter's patch and sign comes along.
+function maybeExpand() {
+  if (world.expansions >= MAX_EXPANSIONS || greenPct() < EXPAND_AT_PCT) return false;
+  const oc = world.cols, or = world.rows;
+  const nc = oc + 2, nr = or + 2;
+  const grid = new Array(nc * nr).fill('b');
+  const owners = {};
+  const seed = Math.floor(Math.random() * 1e6);
+  for (let r = 0; r < nr; r++) {
+    for (let c = 0; c < nc; c++) {
+      const i = r * nc + c;
+      const inner = c >= 1 && c <= oc && r >= 1 && r <= or;
+      if (inner) {
+        const oi = (r - 1) * oc + (c - 1);
+        grid[i] = world.grid[oi];
+        if (world.owners[oi]) owners[i] = world.owners[oi];
+      } else if (wildPocket(c, r, seed)) {
+        grid[i] = 'g';
+      }
+    }
   }
-  if (data && Array.isArray(data.grid) && data.grid.length === MAP_COLS * MAP_ROWS) {
-    return { grid: data.grid, owners: data.owners || {}, protected: data.protected || {} };
-  }
-  return null; // first boot or corrupt — regenerate
+  world = { cols: nc, rows: nr, grid, owners, expansions: world.expansions + 1 };
+  saveWorld();
+  io.emit('map', mapPayload({ grew: true }));
+  return true;
 }
 
 function greenPct() {
@@ -228,47 +285,40 @@ function restorePatch(idx, name, avatar) {
   world.grid[idx] = 'g';
   const owner = { name, avatar };
   world.owners[idx] = owner;
-  world.protected[idx] = Date.now() + RESTORE_GRACE_MS;
   saveWorld();
   getPlayer(name, avatar).patches++;
   savePlayers();
   io.emit('patch', { idx, state: 'g', cause: 'restore', owner });
   broadcastLeaderboard();
+  maybeExpand(); // enough green? the world grows a ring
   return true;
 }
 
 function neighbors(idx) {
-  const r = Math.floor(idx / MAP_COLS);
-  const c = idx % MAP_COLS;
+  const { cols, rows } = world;
+  const r = Math.floor(idx / cols);
+  const c = idx % cols;
   const out = [];
-  if (r > 0) out.push(idx - MAP_COLS);
-  if (r < MAP_ROWS - 1) out.push(idx + MAP_COLS);
+  if (r > 0) out.push(idx - cols);
+  if (r < rows - 1) out.push(idx + cols);
   if (c > 0) out.push(idx - 1);
-  if (c < MAP_COLS - 1) out.push(idx + 1);
+  if (c < cols - 1) out.push(idx + 1);
   return out;
 }
 
-// One tick of the plague: a random green patch on the frontier turns barren.
-// Patches inside their restore grace period are never picked, and nothing
+// One tick of the plague: a random WILD green patch on the frontier turns
+// barren. A patch with a planter's sign on it is never touched, and nothing
 // happens at all once the world is at or below the green floor.
-// ignoreGrace is a test-only switch so the floor can be exercised alone.
-function spread({ ignoreGrace = false } = {}) {
+function spread() {
   if (greenPct() <= PLAGUE_FLOOR_PCT) return;
-  const now = Date.now();
-  Object.keys(world.protected).forEach(k => { // forget expired protections
-    if (world.protected[k] <= now || world.grid[k] !== 'g') delete world.protected[k];
-  });
   const frontier = [];
   world.grid.forEach((v, i) => {
-    if (v !== 'g') return;
-    if (!ignoreGrace && world.protected[i]) return;
+    if (v !== 'g' || world.owners[i]) return;
     if (neighbors(i).some(n => world.grid[n] === 'b')) frontier.push(i);
   });
   if (frontier.length === 0) return;
   const victim = frontier[Math.floor(Math.random() * frontier.length)];
   world.grid[victim] = 'b';
-  delete world.owners[victim];
-  delete world.protected[victim];
   saveWorld();
   io.emit('patch', { idx: victim, state: 'b', cause: 'spread' });
 }
@@ -283,14 +333,19 @@ if (!process.env.SPREAD_DISABLED) {
 
 // Test-only hooks so e2e tests can control the world deterministically.
 if (process.env.TEST_MODE) {
-  app.post('/debug/spread', (req, res) => {
-    spread({ ignoreGrace: req.query.ignoreGrace === '1' });
+  app.post('/debug/spread', (req, res) => { spread(); res.sendStatus(204); });
+  app.post('/debug/kill', (req, res) => {
+    world = { ...world, grid: world.grid.map(() => 'b'), owners: {} };
+    saveWorld();
+    io.emit('map', mapPayload());
     res.sendStatus(204);
   });
-  app.post('/debug/kill', (req, res) => {
-    world = { grid: world.grid.map(() => 'b'), owners: {}, protected: {} };
+  // Greens the first `count` barren patches as WILD forest (no planter)
+  app.post('/debug/wild', (req, res) => {
+    let left = parseInt(req.body.count, 10) || 0;
+    world.grid = world.grid.map(v => (v === 'b' && left-- > 0) ? 'g' : v);
     saveWorld();
-    io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+    io.emit('map', mapPayload());
     res.sendStatus(204);
   });
   app.post('/debug/reset', (req, res) => {
@@ -298,7 +353,7 @@ if (process.env.TEST_MODE) {
     saveWorld();
     players = {};
     savePlayers();
-    io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+    io.emit('map', mapPayload());
     broadcastLeaderboard();
     res.sendStatus(204);
   });
@@ -307,7 +362,7 @@ if (process.env.TEST_MODE) {
 // ---------- Sockets ----------
 
 io.on('connection', (socket) => {
-  socket.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+  socket.emit('map', mapPayload());
   socket.emit('leaderboard', rankedPlayers());
   io.emit('players', io.engine.clientsCount);
 
@@ -347,7 +402,7 @@ io.on('connection', (socket) => {
     if (!done) return;
     world = freshWorld();
     saveWorld();
-    io.emit('map', { cols: MAP_COLS, rows: MAP_ROWS, grid: world.grid, owners: world.owners });
+    io.emit('map', mapPayload());
     done({ ok: true });
   });
 

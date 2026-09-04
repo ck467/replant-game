@@ -153,11 +153,20 @@ wild groves looked like forest but were scenery. The grid now covers every
 land tile — 31×16, nearly 500 patches, with the river along the right edge
 and the fence below — so if it looks like a tree, it can be tapped.
 
+### 16. "Don't destroy what they restored — grow the map instead"
+The plague had been undoing the kids' work. Now a restored patch is
+permanent: the bulldozers only ever take wild forest nobody planted. And the
+world grows — whenever the land reaches 60% green, a ring of new land appears
+around the map (mostly barren, with pockets of wild green), the HUD counts
+down the patches to the next ring, and everyone online sees the forest grow.
+The dead zone also got texture: ash tints and rocks, logs and stumps beside
+the dead trees.
+
 ---
 
 ## Quality practice
 
-Every feature landed with Playwright end-to-end coverage — **21 tests** at the
+Every feature landed with Playwright end-to-end coverage — **23 tests** at the
 time of writing, spanning account creation, the tutorial, merging (tap and
 drag), the qualification rule, quit warnings, the message band, leaderboard
 paging and drawer behavior, the admin resets, bulldozer destruction, the
@@ -176,8 +185,8 @@ regressions).
 3. Kids visit the URL, make an account, and race to 4 trees.
 4. Balance knobs if needed (`public/js/config.js` / `server.js`):
    `CHALLENGE.GOAL_TREES`, `CHALLENGE.TIME_MS`, `SPAWN_WEIGHTS`,
-   `SPREAD_INTERVAL_MS` (90s), `RESTORE_GRACE_MS` (a new tree is safe from
-   the plague for 10 min), `PLAGUE_FLOOR_PCT` (the plague halts at 15% green).
+   `SPREAD_INTERVAL_MS` (90s), `PLAGUE_FLOOR_PCT` (the plague halts at 15%
+   green), `EXPAND_AT_PCT` (the world grows a ring at 60% green).
 
 ## The message, by design
 

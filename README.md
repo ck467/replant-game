@@ -48,11 +48,13 @@ Everything lives in `public/js/config.js`:
 | `RESTORE_GOAL_PCT` | 75 | Green % that counts as "balance restored" |
 | `SPECIES` | Lemon, Coffee, Orange, Avocado | Names, sprite tiles, and win-screen facts |
 
-The plague itself is tuned in `server.js` (or by environment variable):
+The world itself is tuned in `server.js` (or by environment variable):
 `SPREAD_INTERVAL_MS` (90s between bulldozings, only while someone is
-connected), `RESTORE_GRACE_MS` (a freshly restored patch is safe for 10
-minutes), and `PLAGUE_FLOOR_PCT` (the plague halts at 15% green or less, so
-the world can never be eaten to nothing).
+connected), `PLAGUE_FLOOR_PCT` (the plague halts at 15% green or less),
+`EXPAND_AT_PCT` (at 60% green a ring of new land appears), and
+`MAX_EXPANSIONS` / `NEW_LAND_GREEN_PCT` (up to 10 rings, each 22% wild green
+in pockets). The plague only ever eats wild forest: a patch a planter
+restored is theirs for good.
 
 ## How it plays
 
@@ -74,7 +76,12 @@ the world can never be eaten to nothing).
   centered. Always on screen on desktop; a drawer (🏆 button) on small
   screens. Live-updates for everyone over Socket.IO.
 - **Signposts** — every restored patch on the map carries a little wooden
-  signpost painted with the planter's name (hover shows "Restored by ___").
+  signpost painted with the planter's name (hover shows "Restored by ___"),
+  and the plague can never take it back.
+- **A world that grows** — the map starts at 31×16. Whenever the land is 60%
+  green, a ring of new land (mostly barren, with wild green pockets) appears
+  around it and everyone is told the forest has grown; the HUD counts down
+  the patches to the next ring. Up to ten rings (51×36).
 - **Admin resets** — signing in as `admin` shows two buttons: ↺ resets the
   world map (leaderboard kept) and 🗑️ clears the leaderboard (map kept).
   Each asks for the admin key, which the server checks against its

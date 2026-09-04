@@ -421,25 +421,70 @@ test('at 0% green the whole world goes dark, and replanting revives it', async (
   await expect(page.locator('.critter').first()).toBeVisible();
 });
 
-test('the plague spares freshly restored patches and halts at the green floor', async ({ page }) => {
+test('the plague only ever eats wild forest: planted patches are permanent', async ({ page }) => {
   await freshGame(page);
   await enterMap(page);
   await page.request.post('/debug/kill');
   await expect(page.locator('#green-pct')).toHaveText('0%');
-  // 80 fresh restores (16% green), every one inside its grace period
+  // 80 planted patches (with signs) and 30 wild ones nobody planted
   await page.evaluate(() => {
     for (let i = 0; i < 80; i++) window.__socket.emit('restore', { idx: i, name: 'Kid', avatar: 1 });
   });
   await expect(page.locator('.patch.green')).toHaveCount(80);
-  for (let i = 0; i < 3; i++) await page.request.post('/debug/spread');
-  await page.waitForTimeout(2500); // longer than a bulldozer's drive-in
-  await expect(page.locator('.patch.green')).toHaveCount(80); // nothing was bulldozed
-  // Once the grace has passed the plague bites again — but only down to the
-  // floor: 15% of 496 patches means it stops at 74 green
-  for (let i = 0; i < 10; i++) await page.request.post('/debug/spread?ignoreGrace=1');
+  await page.request.post('/debug/wild', { data: { count: 30 } });
+  await expect(page.locator('.patch.green')).toHaveCount(110);
+  // Plenty of plague: every wild patch goes, every planted one stays
+  for (let i = 0; i < 40; i++) await page.request.post('/debug/spread');
+  await expect(page.locator('.patch.green')).toHaveCount(80, { timeout: 20000 });
+  await page.waitForTimeout(2000);
+  await expect(page.locator('.patch.green')).toHaveCount(80);
+  await expect(page.locator('.patch-sign')).toHaveCount(80);
+});
+
+test('the plague halts at the green floor', async ({ page }) => {
+  await freshGame(page);
+  await enterMap(page);
+  await page.request.post('/debug/kill');
+  await page.request.post('/debug/wild', { data: { count: 90 } }); // 18% wild green
+  await expect(page.locator('.patch.green')).toHaveCount(90);
+  for (let i = 0; i < 30; i++) await page.request.post('/debug/spread');
+  // 15% of 496 patches: it stops at 74 green
   await expect(page.locator('.patch.green')).toHaveCount(74, { timeout: 20000 });
   await page.waitForTimeout(2000);
   await expect(page.locator('.patch.green')).toHaveCount(74);
+});
+
+test("at 60% green the world grows a ring of new land, planters' signs intact", async ({ page }) => {
+  await freshGame(page, { name: 'Grower' });
+  await enterMap(page);
+  await expect(page.locator('#expand-hint')).toContainText('and the forest grows');
+  // Plant one patch with a sign, then push wild green to one short of 60%
+  await page.evaluate(() => {
+    const idx = +document.querySelector('.patch.barren').dataset.mapIdx;
+    window.__socket.emit('restore', { idx, name: 'Grower', avatar: 3 });
+  });
+  await expect(page.locator('.patch-sign-name')).toHaveText(['Grower']);
+  const green = await page.locator('.patch.green').count();
+  const target = Math.ceil(PATCHES * 0.6) - 1;
+  await page.request.post('/debug/wild', { data: { count: target - green } });
+  await expect(page.locator('.patch.green')).toHaveCount(target);
+  await expect(page.locator('#expand-hint')).toContainText('1 more green patch');
+  await expect(page.locator('.patch')).toHaveCount(PATCHES); // not yet
+  // The next restore tips it over: a ring of new land, 33x18 now
+  await page.evaluate(() => {
+    const idx = +document.querySelector('.patch.barren').dataset.mapIdx;
+    window.__socket.emit('restore', { idx, name: 'Grower', avatar: 3 });
+  });
+  await expect(page.locator('.patch')).toHaveCount(33 * 18);
+  await expect(page.locator('#toast')).toContainText('forest grows');
+  await expect(page.locator('.patch-sign-name')).toHaveCount(2); // both signs came along
+  await expect(page.locator('.patch-sign-name').first()).toHaveText('Grower');
+  // The ring is mostly barren with wild pockets, so the percentage drops
+  // back under the threshold and the next milestone is further away
+  const pct = await page.evaluate(() => worldMap.greenPct());
+  expect(pct).toBeLessThan(60);
+  expect(pct).toBeGreaterThan(45);
+  await expect(page.locator('#expand-hint')).toContainText('more green patches');
 });
 
 test('world state survives a page reload (lives on the server)', async ({ page }) => {

@@ -396,6 +396,8 @@ body:has(#map-screen.active) { background: #3abe41; }
 }
 .map-status.good { color: var(--grass-dark); }
 .map-status.bad { color: #d63031; }
+.expand-hint { font-size: 0.8rem; padding: 4px 12px; margin-top: 6px; color: var(--wood-mid); }
+.expand-hint:empty { display: none; }
 
 /* Pixel-art world map — "Blind Hummingbird" forest set by Spriteshift (CC0).
    Tiles are 16px in 8x4 sheets, addressed as CSS sprites:
@@ -476,6 +478,20 @@ body:has(#map-screen.active) { background: #3abe41; }
   filter: brightness(1.25);
   z-index: 2;
   position: relative;
+}
+/* The dead zone gets texture: three ash tints, and rocks/logs/stumps on some tiles */
+.patch.barren.ash-1 { filter: brightness(1.08) sepia(0.18); }
+.patch.barren.ash-2 { filter: brightness(0.92); }
+.patch .patch-decor {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 46%;
+  height: 46%;
+  background-image: url('../assets/forest_decoration_set_16x16.png');
+  background-size: 800% 400%;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 .patch.barren.clearing { background-position: 57.142857% 66.666667%; }
 .patch.barren.clearing.d0,
