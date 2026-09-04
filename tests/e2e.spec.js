@@ -87,9 +87,16 @@ test('tapping a dead tree starts a timed run; living forest is scenery', async (
   // Living trees do nothing (they're disabled buttons: dispatch a click directly)
   await page.evaluate(() => document.querySelector('.patch.green').click());
   await expect(page.locator('#world-map')).toBeVisible();
-  // There is no painted-on forest any more: every non-river, non-fence tile is a patch
+  // Around the grid lies the locked meadow the world will grow into (up to
+  // 51x36), then the river and the fence; nothing else is painted on
+  const locked = await page.locator('.scene-cell.locked').count();
+  expect(locked).toBe(51 * 36 - PATCHES);
   const scenery = await page.locator('.scene-cell').count();
-  expect(scenery).toBe(32 * 18 - PATCHES);
+  expect(scenery).toBe(52 * 38 - PATCHES);
+  // Tapping locked land explains what opens it
+  await page.evaluate(() => document.querySelector('.scene-cell.locked').click());
+  await expect(page.locator('#toast')).toContainText('This land is locked');
+  await expect(page.locator('#toast')).toContainText('and the forest grows');
   // A grey dead tree starts the run
   await tapDeadTree(page);
   await expect(page.locator('#puzzle-board')).toBeVisible();
@@ -476,6 +483,7 @@ test("at 60% green the world grows a ring of new land, planters' signs intact", 
     window.__socket.emit('restore', { idx, name: 'Grower', avatar: 3 });
   });
   await expect(page.locator('.patch')).toHaveCount(33 * 18);
+  await expect(page.locator('.scene-cell.locked')).toHaveCount(51 * 36 - 33 * 18); // one ring unlocked
   await expect(page.locator('#toast')).toContainText('forest grows');
   await expect(page.locator('.patch-sign-name')).toHaveCount(2); // both signs came along
   await expect(page.locator('.patch-sign-name').first()).toHaveText('Grower');

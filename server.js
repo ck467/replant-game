@@ -162,6 +162,9 @@ function mapPayload(extra = {}) {
     owners: world.owners,
     expandAt: EXPAND_AT_PCT,
     maxed: world.expansions >= MAX_EXPANSIONS,
+    // The client draws the whole eventual world as locked meadow around the map
+    maxCols: START_COLS + 2 * MAX_EXPANSIONS,
+    maxRows: START_ROWS + 2 * MAX_EXPANSIONS,
     ...extra
   };
 }

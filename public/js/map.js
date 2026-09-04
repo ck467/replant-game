@@ -2,12 +2,14 @@
 // The server owns the grid; this class renders it and forwards actions.
 //
 // The screen is an expansive tile scene — bigger than most viewports — that
-// the player pans around, at 64px per tile (4x pixel scale). Every land
-// tile is a playable patch (the server's cols x rows grid, from the top-left
-// corner); a river runs down the right edge into a full-width channel along
-// the bottom, and a fence closes the last row. There is no painted-on
-// forest: if it looks like a tree, it can be tapped. The world GROWS: the
-// server adds a ring of land whenever it is green enough.
+// the player pans around, at 64px per tile (4x pixel scale). It is drawn at
+// the world's EVENTUAL size (the server's maxCols x maxRows): the playable
+// cols x rows grid sits centered in it, and everything around the grid is
+// locked meadow — grass and flowers with a lock on each tile — that opens
+// ring by ring as the world grows. A river runs down the far right edge into
+// a full-width channel along the bottom, and a fence closes the last row.
+// Inside the grid there is no painted-on forest: if it looks like a tree, it
+// can be tapped.
 const SCENE = {
   TILE: 64,
   HB: 'assets/blind_hummingbird_spritesheet_16x16.png',    // 8x4 sheet
@@ -16,16 +18,21 @@ const SCENE = {
 
 // Decoration-sheet tiles [col, row] that suit the dead zone: stones, a rock, a log, a boulder
 const DEAD_DECOR = [[0, 0], [1, 0], [2, 0], [6, 0]];
+// …and the locked meadow: sprigs, flowers, white flowers
+const MEADOW_DECOR = [[2, 1], [3, 1], [4, 1]];
 
 class WorldMap {
-  constructor(socket, { onPatchClick, onSpread, onChange, onGrow }) {
+  constructor(socket, { onPatchClick, onLockedClick, onSpread, onChange, onGrow }) {
     this.socket = socket;
     this.onPatchClick = onPatchClick;
+    this.onLockedClick = onLockedClick;
     this.onSpread = onSpread;
     this.onChange = onChange;
     this.onGrow = onGrow;
     this.cols = CONFIG.MAP_COLS;
     this.rows = CONFIG.MAP_ROWS;
+    this.maxCols = CONFIG.MAP_COLS;
+    this.maxRows = CONFIG.MAP_ROWS;
     this.grid = [];
     this.expandAt = 60;
     this.maxed = false;
@@ -33,22 +40,19 @@ class WorldMap {
 
     this.owners = {};
 
-    socket.on('map', ({ cols, rows, grid, owners, expandAt, maxed, grew }) => {
-      // A new ring adds one tile on every side: shift the view and the
-      // roaming sprites along with it so nothing on screen jumps
-      const shift = this.grid.length && cols > this.cols ? ((cols - this.cols) / 2) * SCENE.TILE : 0;
+    socket.on('map', ({ cols, rows, grid, owners, expandAt, maxed, maxCols, maxRows, grew }) => {
+      const first = !this.grid.length;
       this.cols = cols;
       this.rows = rows;
       this.grid = grid;
       this.owners = owners || {};
       if (expandAt !== undefined) this.expandAt = expandAt;
+      if (maxCols) { this.maxCols = maxCols; this.maxRows = maxRows; }
       this.maxed = !!maxed;
-      if (shift) {
-        this.panX -= shift;
-        this.panY -= shift;
-        [...this.dozers, ...this.critters].forEach(s => { s.x += shift; s.y += shift; });
-      }
+      // The grid stays centered in the full scene, so a new ring simply
+      // unlocks in place — nothing on screen moves
       this.render();
+      if (first) this.centerOnPlayGrid();
       this.onChange();
       if (grew && this.onGrow) this.onGrow();
     });
@@ -72,33 +76,37 @@ class WorldMap {
     });
   }
 
-  // The scene is the grid plus a river column on the right and a river
-  // channel + fence row along the bottom
-  get sceneCols() { return this.cols + 1; }
-  get sceneRows() { return this.rows + 2; }
-  get riverCol() { return this.cols; }
-  get riverRow() { return this.rows; }
-  get fenceRow() { return this.rows + 1; }
+  // The scene is the eventual world plus a river column on the right and a
+  // river channel + fence row along the bottom; the current grid sits
+  // centered at (offC, offR)
+  get sceneCols() { return this.maxCols + 1; }
+  get sceneRows() { return this.maxRows + 2; }
+  get riverCol() { return this.maxCols; }
+  get riverRow() { return this.maxRows; }
+  get fenceRow() { return this.maxRows + 1; }
+  get offC() { return (this.maxCols - this.cols) / 2; }
+  get offR() { return (this.maxRows - this.rows) / 2; }
 
   // ----- Bulldozers: the deforestation made visible -----
 
   patchScenePx(idx) {
-    const c = idx % this.cols;
-    const r = Math.floor(idx / this.cols);
+    const c = this.offC + (idx % this.cols);
+    const r = this.offR + Math.floor(idx / this.cols);
     return { x: c * SCENE.TILE, y: r * SCENE.TILE };
   }
 
   initDozers() {
-    // Two dozers idle in the deforested (right) half
+    // Two dozers idle in the deforested (right) half; beetles wander the
+    // left. Positions are grid tiles, placed in scene px on first render.
     this.dozers = [
-      { x: 22 * SCENE.TILE, y: 3 * SCENE.TILE, flip: false, el: null },
-      { x: 26 * SCENE.TILE, y: 10 * SCENE.TILE, flip: true, el: null }
+      { gc: 22, gr: 3, flip: false, el: null },
+      { gc: 26, gr: 10, flip: true, el: null }
     ];
     // A few beetles wander the meadow (4-frame walk cycle from the HB sheet)
     this.critters = [
-      { x: 3 * SCENE.TILE, y: 5 * SCENE.TILE, flip: false, el: null, pace: 7 },
-      { x: 6 * SCENE.TILE, y: 12 * SCENE.TILE, flip: true, el: null, pace: 9 },
-      { x: 24 * SCENE.TILE, y: 12 * SCENE.TILE, flip: false, el: null, pace: 8 }
+      { gc: 3, gr: 5, flip: false, el: null, pace: 7 },
+      { gc: 6, gr: 12, flip: true, el: null, pace: 9 },
+      { gc: 24, gr: 12, flip: false, el: null, pace: 8 }
     ];
     setInterval(() => this.patrol(), 6000);
     setInterval(() => this.wander(), 5000);
@@ -182,6 +190,13 @@ class WorldMap {
   }
 
   renderDozers() {
+    // First render: turn grid-tile starting spots into scene pixels
+    [...this.dozers, ...this.critters].forEach(s => {
+      if (s.x === undefined) {
+        s.x = (this.offC + s.gc) * SCENE.TILE;
+        s.y = (this.offR + s.gr) * SCENE.TILE;
+      }
+    });
     this.dozers.forEach(d => {
       d.el = document.createElement('div');
       d.el.className = 'dozer' + (d.flip ? ' flip' : '');
@@ -231,7 +246,8 @@ class WorldMap {
       `${(col / 7 * 100).toFixed(4)}% ${(row / 3 * 100).toFixed(4)}%, 0 0`;
   }
 
-  // The only scenery left: the river and the fence
+  // Outside the grid: the river, the fence, and the locked meadow the world
+  // will grow into — grass with sprigs and flowers, a lock on every tile
   buildSceneCell(c, r) {
     const cell = document.createElement('div');
     cell.className = 'scene-cell';
@@ -241,8 +257,17 @@ class WorldMap {
     } else if (r === this.fenceRow) {
       WorldMap.sprite(cell, SCENE.DECOR, 6, 2); // fence line along the bottom
     } else {
-      cell.style.background = "url('assets/grass_16.png')";
-      cell.style.backgroundSize = '100% 100%';
+      cell.classList.add('locked');
+      const h = ((c * 73 + r * 151 + 7) * 2654435761 >>> 0) % 100;
+      if (h < 45) {
+        const [col, row] = MEADOW_DECOR[h % MEADOW_DECOR.length];
+        WorldMap.sprite(cell, SCENE.DECOR, col, row);
+      } else {
+        cell.style.background = "url('assets/grass_16.png')";
+        cell.style.backgroundSize = '100% 100%';
+      }
+      cell.title = 'Locked — grow the forest to open this land';
+      cell.addEventListener('click', () => this.onLockedClick && this.onLockedClick());
     }
     return cell;
   }
@@ -304,10 +329,12 @@ class WorldMap {
     this.updateDeadState();
     this.el.style.gridTemplateColumns = `repeat(${this.sceneCols}, var(--tile))`;
     this.el.innerHTML = '';
+    const { offC, offR } = this;
     for (let r = 0; r < this.sceneRows; r++) {
       for (let c = 0; c < this.sceneCols; c++) {
-        const inPlay = c < this.cols && r < this.rows;
-        this.el.appendChild(inPlay ? this.buildPatch(r * this.cols + c) : this.buildSceneCell(c, r));
+        const pc = c - offC, pr = r - offR;
+        const inPlay = pc >= 0 && pc < this.cols && pr >= 0 && pr < this.rows;
+        this.el.appendChild(inPlay ? this.buildPatch(pr * this.cols + pc) : this.buildSceneCell(c, r));
       }
     }
     if (this.dozers) this.renderDozers();
@@ -383,8 +410,8 @@ class WorldMap {
   }
 
   centerOnPlayGrid() {
-    const cx = (this.cols / 2) * SCENE.TILE;
-    const cy = (this.rows / 2) * SCENE.TILE;
+    const cx = (this.offC + this.cols / 2) * SCENE.TILE;
+    const cy = (this.offR + this.rows / 2) * SCENE.TILE;
     this.panX = window.innerWidth / 2 - cx;
     this.panY = window.innerHeight / 2 - cy;
     this.applyPan();

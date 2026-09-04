@@ -479,6 +479,27 @@ body:has(#map-screen.active) { background: #3abe41; }
   z-index: 2;
   position: relative;
 }
+/* Locked meadow around the map: a little dimmer than live land, a lock on each tile */
+.scene-cell.locked {
+  position: relative;
+  cursor: not-allowed;
+}
+.scene-cell.locked::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 40, 20, 0.22);
+}
+.scene-cell.locked::after {
+  content: '🔒';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  opacity: 0.55;
+}
 /* The dead zone gets texture: three ash tints, and rocks/logs/stumps on some tiles */
 .patch.barren.ash-1 { filter: brightness(1.08) sepia(0.18); }
 .patch.barren.ash-2 { filter: brightness(0.92); }

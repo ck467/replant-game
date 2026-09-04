@@ -78,10 +78,13 @@ restored is theirs for good.
 - **Signposts** — every restored patch on the map carries a little wooden
   signpost painted with the planter's name (hover shows "Restored by ___"),
   and the plague can never take it back.
-- **A world that grows** — the map starts at 31×16. Whenever the land is 60%
-  green, a ring of new land (mostly barren, with wild green pockets) appears
-  around it and everyone is told the forest has grown; the HUD counts down
-  the patches to the next ring. Up to ten rings (51×36).
+- **A world that grows** — the map starts at 31×16, centered in a locked
+  meadow (grass and flowers, a 🔒 on every tile) that shows the whole
+  eventual world. Whenever the land is 60% green, the next ring of that
+  meadow unlocks as new land (mostly barren, with wild green pockets) and
+  everyone is told the forest has grown; the HUD counts down the patches to
+  the next ring, and tapping locked land says the same. Up to ten rings
+  (51×36).
 - **Admin resets** — signing in as `admin` shows two buttons: ↺ resets the
   world map (leaderboard kept) and 🗑️ clears the leaderboard (map kept).
   Each asks for the admin key, which the server checks against its

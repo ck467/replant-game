@@ -12,22 +12,23 @@ function showScreen(id) {
   if (id === 'map-screen') focusLeaderboard();
 }
 
+// How far the world is from growing its next ring of land
+function expansionHint() {
+  if (worldMap.maxed) return '🌍 The forest has grown as far as it can!';
+  const total = worldMap.grid.length;
+  const green = worldMap.grid.filter(v => v === 'g').length;
+  const need = Math.max(0, Math.ceil(total * worldMap.expandAt / 100) - green);
+  return need > 0
+    ? `🌱 ${need} more green ${need === 1 ? 'patch' : 'patches'} and the forest grows!`
+    : '🌱 The forest is about to grow!';
+}
+
 function updateHud() {
   const pct = worldMap.greenPct();
   document.getElementById('green-pct').textContent = pct + '%';
   document.getElementById('green-bar-fill').style.width = pct + '%';
   // The world grows when it's green enough: show how close everyone is
-  const hint = document.getElementById('expand-hint');
-  const total = worldMap.grid.length;
-  const green = worldMap.grid.filter(v => v === 'g').length;
-  if (worldMap.maxed) {
-    hint.textContent = '🌍 The forest has grown as far as it can!';
-  } else {
-    const need = Math.max(0, Math.ceil(total * worldMap.expandAt / 100) - green);
-    hint.textContent = need > 0
-      ? `🌱 ${need} more green ${need === 1 ? 'patch' : 'patches'} and the forest grows!`
-      : '🌱 The forest is about to grow!';
-  }
+  document.getElementById('expand-hint').textContent = expansionHint();
   const status = document.getElementById('map-status');
   if (pct >= CONFIG.RESTORE_GOAL_PCT) {
     status.textContent = '🎉 Balance restored! The forest is thriving again.';
@@ -320,6 +321,8 @@ function init() {
 
   worldMap = new WorldMap(socket, {
     onPatchClick: idx => challenge.start(idx),
+    // Locked meadow around the map: tell them what opens it
+    onLockedClick: () => toast(`🔒 This land is locked. ${expansionHint()}`, 3500),
     // Every destroyed patch teaches a real consequence
     onSpread: () => {
       const impact = CONFIG.IMPACTS[Math.floor(Math.random() * CONFIG.IMPACTS.length)];

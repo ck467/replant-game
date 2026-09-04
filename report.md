@@ -160,7 +160,10 @@ world grows — whenever the land reaches 60% green, a ring of new land appears
 around the map (mostly barren, with pockets of wild green), the HUD counts
 down the patches to the next ring, and everyone online sees the forest grow.
 The dead zone also got texture: ash tints and rocks, logs and stumps beside
-the dead trees.
+the dead trees. And the land yet to be earned is visible from day one: the
+map sits centered in a locked meadow of grass and flowers (the student's
+tiles), a 🔒 on every tile, and each ring simply unlocks in place — tap the
+lock and the game tells you how many patches until it opens.
 
 ---
 
